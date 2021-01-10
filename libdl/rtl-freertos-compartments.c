@@ -178,7 +178,9 @@ rtl_freertos_global_symbols_add(rtems_rtl_obj* obj) {
         symtab_start[i].st_size,
         __CHERI_CAP_PERMISSION_GLOBAL__ | \
         __CHERI_CAP_PERMISSION_PERMIT_LOAD__ | \
-        __CHERI_CAP_PERMISSION_PERMIT_STORE__);
+        __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
+        __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
+        __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
       } else if (ELF_ST_TYPE(symtab_start[i].st_info) == STT_FUNC) {
         cap = cheri_build_code_cap_unbounded((ptraddr_t) symtab_start[i].st_value,
         __CHERI_CAP_PERMISSION_ACCESS_SYSTEM_REGISTERS__ | \
