@@ -637,11 +637,12 @@ rtems_rtl_load (const char* name, int mode)
         pobj->flags &= ~RTEMS_RTL_OBJ_LOCKED;
       }
     }
-  }
 
     if (!rtems_rtl_obj_post_resolve_reloc (obj)) {
       return NULL;
     }
+  }
+
 
   return obj;
 }
