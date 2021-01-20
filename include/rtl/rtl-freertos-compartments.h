@@ -6,14 +6,12 @@
 #include <rtl/rtl-obj.h>
 
 typedef struct compartment {
-  void*       cap;
-  void*       obj;
   void**      captable;
-  char*       name;
-  size_t      size;
-} compartment_t;
+  void*       obj;
+  uint64_t    id;
+} Compartment_t;
 
-extern compartment_t comp_list[configCOMPARTMENTS_NUM];
+extern Compartment_t comp_list[configCOMPARTMENTS_NUM];
 extern char comp_strtab[configCOMPARTMENTS_NUM][configMAXLEN_COMPNAME];
 
 void *rtl_freertos_compartment_open(const char *name);
@@ -97,4 +95,10 @@ rtl_cherifreertos_captable_install_new_cap(rtems_rtl_obj* obj, void* new_cap);
  */
 uint32_t
 rtl_cherifreertos_compartment_get_free_compid(void);
+
+/**
+ * Create a new inter-compartment trampoline for external domain-crossing calls
+ */
+void*
+rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t compid);
 #endif

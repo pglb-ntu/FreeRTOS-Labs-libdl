@@ -36,7 +36,7 @@ extern Elf_Sym*  __symtab_end;
 extern char*  __strtab_start;
 extern char*  __strtab_end;
 
-compartment_t comp_list[configCOMPARTMENTS_NUM];
+Compartment_t comp_list[configCOMPARTMENTS_NUM];
 static uint32_t comp_id_free = 0;
 
 void* rtl_freertos_compartment_open(const char *name)
