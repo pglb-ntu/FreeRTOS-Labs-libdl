@@ -1468,14 +1468,6 @@ rtems_rtl_obj_load (rtems_rtl_obj* obj)
     return false;
   }
 
-#ifdef __CHERI_PURE_CAPABILITY__
-  if (!rtl_cherifreertos_compartment_set_obj(obj))
-  {
-    rtems_rtl_set_error (errno, "couldn't set an obj for a compartment");
-    return false;
-  }
-#endif
-
   ff_fclose (fd);
 
 #else
@@ -1516,6 +1508,14 @@ rtems_rtl_obj_load (rtems_rtl_obj* obj)
   }
 
   close (fd);
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+  if (!rtl_cherifreertos_compartment_set_obj(obj))
+  {
+    rtems_rtl_set_error (errno, "couldn't set an obj for a compartment");
+    return false;
+  }
 #endif
 
    /*
