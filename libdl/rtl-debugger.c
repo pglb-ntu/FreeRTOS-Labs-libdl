@@ -52,6 +52,10 @@ _rtld_linkmap_add (rtems_rtl_obj* obj)
 
   printf("rtld: gdb: %s 0x%xlu\n", obj->oname, obj->text_base);
 
+#if __CHERI_PURE_CAPABILITY__
+  printf("%s's captable @ %p\n",  obj->oname, obj->captable);
+#endif
+
   if (rtems_rtl_trace (RTEMS_RTL_TRACE_DETAIL))
     printf ("rtl: linkmap_add\n");
 
