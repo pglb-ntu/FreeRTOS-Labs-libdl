@@ -1251,6 +1251,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
         osym->value += (intptr_t) symsect->base;
 #ifdef __CHERI_PURE_CAPABILITY__
         void *cap = NULL;
+	void *tramp_cap = NULL;
 
         if (ELF_ST_TYPE(osym->data >> 16) == STT_OBJECT) {
           cap = cheri_build_data_cap((ptraddr_t) osym->value,
@@ -1260,6 +1261,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
           __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
+          osym->capability = rtl_cherifreertos_captable_install_new_cap(obj, cap);
         } else if (ELF_ST_TYPE(osym->data >> 16) == STT_FUNC) {
           cap = cheri_build_code_cap((ptraddr_t) osym->value,
           osym->size,
@@ -1269,9 +1271,14 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
           __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
+          tramp_cap = rtl_cherifreertos_compartments_setup_ecall(cap, obj->comp_id);
+
+          if (tramp_cap == NULL)
+            return false;
+
+          osym->capability = rtl_cherifreertos_captable_install_new_cap(obj, tramp_cap);
         }
 
-        osym->capability = rtl_cherifreertos_captable_install_new_cap(obj, cap);
         if (!osym->capability) {
           printf("Failed to install a new cap\n");
           return false;
@@ -1300,6 +1307,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
         osym->value += (intptr_t) symsect->base;
 #ifdef __CHERI_PURE_CAPABILITY__
         void *cap = NULL;
+	void *tramp_cap = NULL;
 
         if (ELF_ST_TYPE(osym->data >> 16) == STT_OBJECT) {
           cap = cheri_build_data_cap((ptraddr_t) osym->value,
@@ -1309,18 +1317,25 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
           __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
            __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
+          osym->capability = rtl_cherifreertos_captable_install_new_cap(obj, cap);
         } else if (ELF_ST_TYPE(osym->data >> 16) == STT_FUNC) {
           cap = cheri_build_code_cap((ptraddr_t) osym->value,
           osym->size,
           __CHERI_CAP_PERMISSION_GLOBAL__ | \
           __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__ | \
+          __CHERI_CAP_PERMISSION_ACCESS_SYSTEM_REGISTERS__ | \
           __CHERI_CAP_PERMISSION_PERMIT_LOAD__ | \
           __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
+          tramp_cap = rtl_cherifreertos_compartments_setup_ecall(cap, obj->comp_id);
+
+          if (tramp_cap == NULL)
+            return false;
+
+          osym->capability = rtl_cherifreertos_captable_install_new_cap(obj, tramp_cap);
         }
 
-        osym->capability = rtl_cherifreertos_captable_install_new_cap(obj, cap);
         if (!osym->capability) {
           printf("Failed to install a new cap\n");
           return false;
