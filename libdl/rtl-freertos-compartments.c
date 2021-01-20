@@ -427,4 +427,57 @@ rtl_cherifreertos_capstack_alloc(rtems_rtl_obj* obj, size_t stack_depth) {
 
   return true;
 }
+
+void* rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t compid)
+{
+
+  rtems_rtl_obj* kernel_obj = rtems_rtl_baseimage();
+  rtems_rtl_obj_sym* tramp_sym;
+  void* tramp_cap_template;
+  volatile uintcap_t* tramp_cap_instance;
+  void **captable = rtl_cherifreertos_compartment_get_captable(compid);
+
+  /* Find the xPortCompartmentEnterTrampoline template to copy from */
+  tramp_sym = rtems_rtl_symbol_global_find ("xPortCompartmentEnterTrampoline");
+  if (tramp_sym == NULL) {
+    printf("Failed to fine xPortCompartmentEnterTrampoline needed for inter-compartment calls\n");
+    return NULL;
+  }
+
+  tramp_cap_template = kernel_obj->captable[tramp_sym->capability];
+
+  /* Allocate memory for the new trampoline */
+  tramp_cap_instance = rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, tramp_sym->size, true);
+  if (tramp_cap_instance == NULL) {
+    printf("Failed to allocate a new trampoline to do external calls\n");
+    return NULL;
+  }
+
+  /* Copy template code into the newly allocated area of memory */
+  memcpy(tramp_cap_instance, tramp_cap_template, tramp_sym->size);
+
+  /* Setup code cap in the trampoline */
+  tramp_cap_instance[0] = code;
+
+  /* Setup captable in the trampoline */
+  tramp_cap_instance[1] = &comp_list[compid].captable;
+
+  /* Setup the new compartment ID in the trampoline */
+  if (compid >= configCOMPARTMENTS_NUM) {
+    return NULL;
+  }
+  tramp_cap_instance[2] = compid;
+
+  /* Make the trampoline cap RX only */
+  tramp_cap_instance = cheri_build_code_cap((ptraddr_t) tramp_cap_instance,
+      tramp_sym->size,
+      __CHERI_CAP_PERMISSION_ACCESS_SYSTEM_REGISTERS__ | \
+      __CHERI_CAP_PERMISSION_GLOBAL__ | \
+      __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__ | \
+      __CHERI_CAP_PERMISSION_PERMIT_LOAD__ | \
+      __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__);
+
+  /* Create cap and install it */
+  return &tramp_cap_instance[3];
+}
 #endif
