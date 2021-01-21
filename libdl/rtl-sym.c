@@ -558,12 +558,6 @@ rtems_rtl_isymbol_obj_mint (rtems_rtl_obj* src_obj, rtems_rtl_obj* dest_obj, con
     rtems_rtl_set_error (ENOMEM, "Could not mint a new cap to the dest obj");
     return NULL;
   }
-
-    // Seal a minted cap to an external with its owners/src_obj type
-  if (is_func)
-    *(dest_obj->captable + esym->capability) = cheri_seal_cap(*(dest_obj->captable + esym->capability), src_obj->comp_id);
-  else
-    *(dest_obj->captable + esym->capability) = *(dest_obj->captable + esym->capability);
 #endif
 
   // Add the symbol to the dest_obj extenals list
