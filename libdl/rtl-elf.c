@@ -16,7 +16,7 @@
  */
 
 #if HAVE_CONFIG_H
-#include "config.h"
+#include "waf_config.h"
 #endif
 
 #ifdef ipconfigUSE_FAT_LIBDL

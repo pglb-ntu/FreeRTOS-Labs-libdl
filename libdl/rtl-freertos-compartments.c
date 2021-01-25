@@ -1,3 +1,8 @@
+
+#ifdef HAVE_CONFIG_H
+#include <waf_config.h>
+#endif
+
 #ifdef ipconfigUSE_FAT_LIBDL
 #include "ff_headers.h"
 #include "ff_stdio.h"
