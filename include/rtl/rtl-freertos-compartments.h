@@ -96,9 +96,11 @@ rtl_cherifreertos_captable_install_new_cap(rtems_rtl_obj* obj, void* new_cap);
 uint32_t
 rtl_cherifreertos_compartment_get_free_compid(void);
 
+#if __CHERI_PURE_CAPABILITY__
 /**
  * Create a new inter-compartment trampoline for external domain-crossing calls
  */
 void*
 rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t compid);
+#endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
