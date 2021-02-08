@@ -282,7 +282,9 @@ static void write16le(void *loc, uint16_t val) {
 }
 
 static void write32le(void *loc, uint32_t val) {
-  *((uint32_t *) loc) = val;
+  //*((uint32_t *) loc) = val;
+  write16le(loc, val & 0xffff);
+  write16le(loc + 2, (val >> 16) & 0xffff);
 }
 
 static void write64le(void *loc, uint64_t val) {
@@ -294,7 +296,8 @@ static uint16_t read16le(void *loc) {
 }
 
 static uint32_t read32le(void *loc) {
-  return *((uint32_t *) loc);
+  //return *((uint32_t *) loc);
+  return ((uint32_t) read16le(loc + 2) << 16) | (uint32_t) read16le(loc);
 }
 
 static uint64_t read64le(void *loc) {
@@ -397,7 +400,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
     break;
 
   case R_TYPE(RVC_BRANCH): {
-    uint16_t insn = ((*where) & 0xFFFF) & 0xE383;
+    uint16_t insn = (read16le(where) & 0xFFFF) & 0xE383;
     uint16_t imm8 = extractBits(pcrel_val, 8, 8) << 12;
     uint16_t imm4_3 = extractBits(pcrel_val, 4, 3) << 10;
     uint16_t imm7_6 = extractBits(pcrel_val, 7, 6) << 5;
@@ -410,7 +413,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
   break;
 
   case R_TYPE(RVC_JUMP): {
-    uint16_t insn = ((*where) & 0xFFFF) & 0xE003;
+    uint16_t insn = (read16le(where) & 0xFFFF) & 0xE003;
     uint16_t imm11 = extractBits(pcrel_val, 11, 11) << 12;
     uint16_t imm4 = extractBits(pcrel_val, 4, 4) << 11;
     uint16_t imm9_8 = extractBits(pcrel_val, 9, 8) << 9;
@@ -470,7 +473,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
     break;
 
   case R_TYPE(SET6):
-    *((uint8_t *) where) = (*where & 0xc0) | (symvalue & 0x3f);
+    *((uint8_t *) where) = (read32le(where) & 0xc0) | (symvalue & 0x3f);
     break;
   case R_TYPE(SET8):
     *((uint8_t *) where) = symvalue;
@@ -496,7 +499,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
     break;
 
   case R_TYPE(SUB6):
-    *((uint8_t *) where) = (*where & 0xc0) | (((*where & 0x3f) - symvalue) & 0x3f);
+    *((uint8_t *) where) = (read32le(where) & 0xc0) | (((read32le(where) & 0x3f) - symvalue) & 0x3f);
     break;
   case R_TYPE(SUB8):
     *((uint8_t *) where) = *((uint8_t *) where) - symvalue;
@@ -614,12 +617,11 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
       int64_t hi = (gp_rel_val + 0x800) >> 12;
       int64_t lo = (gp_rel_val - (hi << 12)) & 0xFFF;
 
-      short tmpreg = (*where & 0xf80) >> 7;
-      uint32_t cincoff = *(where + 1);
-      cincoff &= ~((0x1f << 7) | (0x1f << 20));
+      short tmpreg = (read16le(where) & 0xf80) >> 7;
+      uint32_t cincoff = read32le(where + 1);
 
       // lui tmpreg, #hi20(cap_addr)
-      write32le(where, (hi << 12) | (tmpreg << 7) | *where);
+      write32le(where, (hi << 12) | (tmpreg << 7) | read32le(where));
 
       // cincoffset ctmpreg, cgp, tmpreg
       write32le((where + 1), (tmpreg << 20) | (tmpreg << 7) | cincoff);
