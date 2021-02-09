@@ -2,12 +2,17 @@
 #define _FREERTOS_RTL_COMPARTMENTS_H_
 
 #include <FreeRTOS.h>
+#include <FreeRTOSConfig.h>
 #include <stdbool.h>
 #include <rtl/rtl-obj.h>
 
 typedef struct compartment {
   void**      captable;
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
   void*       obj;
+#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+  void*       archive;
+#endif /* configCHERI_COMPARTMENTALIZATION_MODE */
   uint64_t    id;
 } Compartment_t;
 
@@ -29,6 +34,15 @@ bool
 rtl_cherifreertos_compartment_set_obj(rtems_rtl_obj* obj);
 
 /**
+ * Set the archive cap this compartment points to.
+ *
+ * @param archive The archive compartment to set.
+ * @retval true If set successfully
+ */
+bool
+rtl_cherifreertos_compartment_set_archive(rtems_rtl_archive* archive);
+
+/**
  * Get the object pointer this comp_id/otype refers to.
  *
  * @param comp_id The compartment ID (held in the otype of the cap)
@@ -36,6 +50,16 @@ rtl_cherifreertos_compartment_set_obj(rtems_rtl_obj* obj);
  */
 rtems_rtl_obj *
 rtl_cherifreertos_compartment_get_obj(size_t comp_id);
+
+
+/**
+ * Get the archive pointer this comp_id/otype refers to.
+ *
+ * @param comp_id The compartment ID (held in the otype of the cap)
+ * @retval NULL if failed, or a pointer to the archive if found.
+ */
+rtems_rtl_archive *
+rtl_cherifreertos_compartment_get_archive(size_t comp_id);
 
 /**
  * Set the obj captable for a compartment.
@@ -47,10 +71,19 @@ bool
 rtl_cherifreertos_compartment_set_captable(rtems_rtl_obj* obj);
 
 /**
- * Get the object's captable this comp_id/otype refers to.
+ * Set the archive captable for a compartment.
+ *
+ * @param archive The archive compartment to set the captable for.
+ * @retval true If set successfully
+ */
+bool
+rtl_cherifreertos_archive_compartment_set_captable(rtems_rtl_archive* archive);
+
+/**
+ * Get the captable this comp_id/otype refers to.
  *
  * @param comp_id The compartment ID (held in the otype of the cap)
- * @retval NULL if failed, or a pointer to the object's captable if found.
+ * @retval NULL if failed, or a pointer to the captable if found.
  */
 void **
 rtl_cherifreertos_compartment_get_captable(size_t comp_id);
@@ -65,6 +98,17 @@ rtl_cherifreertos_compartment_get_captable(size_t comp_id);
  */
 bool
 rtl_cherifreertos_captable_alloc(rtems_rtl_obj* obj, size_t caps_count);
+
+/**
+ * Allocate a new array-based captable for an archive.
+ *
+ * @param archive The archive compartment to allocate a captable for.
+ * @param caps_count The number of capabilities to allocate a table for.
+ * @retval true If allocated successfully
+ * @retval false The table could not be created. The RTL error has the error.
+ */
+bool
+rtl_cherifreertos_captable_archive_alloc(rtems_rtl_archive* archive, size_t caps_count);
 
 /**
  * Allocate a separate stack for each compartment object
@@ -95,6 +139,18 @@ rtl_cherifreertos_captable_install_new_cap(rtems_rtl_obj* obj, void* new_cap);
  */
 uint32_t
 rtl_cherifreertos_compartment_get_free_compid(void);
+
+/**
+ * Get the compartment ID value for a compartment from an object.
+ */
+uint32_t
+rtl_cherifreertos_compartment_get_compid(rtems_rtl_obj* obj);
+
+/**
+ * Get the captable value for a compartment from an object.
+ */
+void **
+rtl_cherifreertos_compartment_obj_get_captable(rtems_rtl_obj* obj);
 
 #if __CHERI_PURE_CAPABILITY__
 /**

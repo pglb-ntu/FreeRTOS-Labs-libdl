@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <link.h>
 #include <rtl/rtl.h>
+#include <rtl/rtl-freertos-compartments.h>
 #include <rtl/rtl-trace.h>
 #include <rtl/rtl-obj-fwd.h>
 
@@ -53,7 +54,8 @@ _rtld_linkmap_add (rtems_rtl_obj* obj)
   printf("rtld: gdb: %s 0x%xlu\n", obj->oname, obj->text_base);
 
 #if __CHERI_PURE_CAPABILITY__
-  printf("%s's captable @ %p\n",  obj->oname, obj->captable);
+  void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
+  printf("%s's captable @ %p\n",  obj->oname, captable);
 #endif
 
   if (rtems_rtl_trace (RTEMS_RTL_TRACE_DETAIL))

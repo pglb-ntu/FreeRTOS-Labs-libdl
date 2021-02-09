@@ -19,6 +19,7 @@
 #include <FreeRTOS.h>
 #include "list.h"
 #include <rtl/rtl-sym.h>
+#include <rtl/rtl-archive.h>
 #include <rtl/rtl-unresolved.h>
 
 #ifdef __cplusplus
@@ -190,6 +191,8 @@ struct rtems_rtl_obj
   const char*         aname;        /**< The archive name containing the
                                      *   object. NULL means the object is not
                                      *   in a lib */
+  rtems_rtl_archive*  archive;      /**< An archive this obj belongs to */
+
   UBaseType_t         ooffset;      /**< The object offset in the archive. */
   size_t              fsize;        /**< Size of the object file. */
   List_t              sections;     /**< The sections of interest in the object
@@ -249,7 +252,7 @@ struct rtems_rtl_obj
   struct link_map*    linkmap;      /**< For GDB. */
   void*               loader;       /**< The file details specific to a
                                      *   loader. */
-#ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
   void**              captable;           /* Capability table per object */
   size_t              captable_free_slot; /* The next free slot in cap table */
   size_t              caps_count;         /* The number of capabilities */

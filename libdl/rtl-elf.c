@@ -1271,8 +1271,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
           __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
-          tramp_cap = rtl_cherifreertos_compartments_setup_ecall(cap, obj->comp_id);
-
+          tramp_cap = rtl_cherifreertos_compartments_setup_ecall(cap, rtl_cherifreertos_compartment_get_compid(obj));
           if (tramp_cap == NULL)
             return false;
 
@@ -1285,9 +1284,11 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
         }
 
         if (rtems_rtl_trace (RTEMS_RTL_TRACE_SYMBOL)) {
+          void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
+
           printf("rtl :sym:locate:cheri: Created a local cap for %s @ rtl_sym %p @ %p ",
-          osym->name, osym, (obj->captable + osym->capability));
-          cheri_print_cap(obj->captable + osym->capability);
+          osym->name, osym, (captable + osym->capability));
+          cheri_print_cap(captable[osym->capability]);
         }
 #endif
         if (rtems_rtl_trace (RTEMS_RTL_TRACE_SYMBOL))
@@ -1328,7 +1329,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
           __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
-          tramp_cap = rtl_cherifreertos_compartments_setup_ecall(cap, obj->comp_id);
+          tramp_cap = rtl_cherifreertos_compartments_setup_ecall(cap, rtl_cherifreertos_compartment_get_compid(obj));
 
           if (tramp_cap == NULL)
             return false;
@@ -1342,9 +1343,11 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
         }
 
         if (rtems_rtl_trace (RTEMS_RTL_TRACE_SYMBOL)) {
+          void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
+
           printf("rtl :sym:locate:cheri: Created a global cap for %s @ rtl_sym %p @ %p ",
-                 osym->name, osym, (obj->captable + osym->capability));
-          cheri_print_cap(*(obj->captable + osym->capability));
+                 osym->name, osym, (captable + osym->capability));
+          cheri_print_cap(captable[osym->capability]);
         }
 #endif
         if (rtems_rtl_trace (RTEMS_RTL_TRACE_SYMBOL))
@@ -1889,6 +1892,7 @@ rtems_rtl_elf_file_load (rtems_rtl_obj* obj, void* fd)
     return false;
 
 #ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
   obj->captable = NULL;
   obj->comp_id  = rtl_cherifreertos_compartment_get_free_compid();
   // Allocate a new captable for this object. The captable is going to be holding
@@ -1906,6 +1910,7 @@ rtems_rtl_elf_file_load (rtems_rtl_obj* obj, void* fd)
   {
     return false;
   }
+#endif /* configCHERI_COMPARTMENTALIZATION_MODE */
 #endif
 
   /*

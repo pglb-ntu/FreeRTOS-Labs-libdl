@@ -39,6 +39,7 @@
 #include <rtl/rtl-trace.h>
 #include "rtl-string.h"
 #include "rtl-error.h"
+#include <rtl/rtl-freertos-compartments.h>
 
 /**
  * Archive headers.
@@ -215,7 +216,7 @@ rtems_rtl_archive_finder (rtems_rtl_archive* archive, void* data)
   return true;
 }
 
-static rtems_rtl_archive*
+rtems_rtl_archive*
 rtems_rtl_archive_find (rtems_rtl_archives* archives,
                         const char*         path)
 {
@@ -815,6 +816,24 @@ rtems_rtl_archive_loader (rtems_rtl_archive* archive, void* data)
 
     archive->flags &= ~RTEMS_RTL_ARCHIVE_LOAD;
 
+#if configCHERI_COMPARTMENTALIZATION_MODE == 2
+  archive->captable = NULL;
+  archive->comp_id  = rtl_cherifreertos_compartment_get_free_compid();
+  // Allocate a new captable for this archive.
+  if (!rtl_cherifreertos_captable_archive_alloc(archive, archive->symbols.entries + 1))
+  {
+    return false;
+  }
+
+  if (!rtl_cherifreertos_compartment_set_archive(archive))
+  {
+    rtems_rtl_set_error (errno, "couldn't set an archive for a compartment");
+    return false;
+  }
+
+  archive->captable_free_slot = 1;
+#endif /* configCHERI_COMPARTMENTALIZATION_MODE */
+
     ++(*loaded);
   }
 
@@ -1179,6 +1198,8 @@ rtems_rtl_archive_obj_load (rtems_rtl_archives* archives,
     rtems_rtl_obj_caches_flush ();
     return rtems_rtl_archive_search_error;
   }
+
+  obj->archive = search.archive;
 
   rtems_rtl_obj_caches_flush ();
 

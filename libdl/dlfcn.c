@@ -18,6 +18,9 @@
 #include <stdint.h>
 #include <dlfcn.h>
 #include <rtl/rtl.h>
+#include <rtl/rtl-freertos-compartments.h>
+
+#include <FreeRTOSConfig.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheri-utility.h>
@@ -128,7 +131,8 @@ dlsym (void* handle, const char *symbol)
   }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-    symval = obj->captable[sym->capability];
+    void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
+    symval = captable[sym->capability];
 #endif
 
   rtems_rtl_unlock ();
@@ -166,10 +170,11 @@ dlinfo (void* handle, int request, void** p)
         rc = 0;
         break;
 #ifdef __CHERI_PURE_CAPABILITY__
-      case RTLD_DI_CHERI_CAPTABLE:
-        *p = cheri_seal_cap((void *) obj->captable, obj->comp_id);
+      case RTLD_DI_CHERI_CAPTABLE: {
+        void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
+        *p = cheri_seal_cap(captable, rtl_cherifreertos_compartment_get_compid(obj));
         rc = 0;
-        break;
+     } break;
 #endif
       default:
         break;

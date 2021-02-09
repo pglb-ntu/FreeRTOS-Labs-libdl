@@ -49,6 +49,7 @@
 #include "rtl-unwind.h"
 #include "rtl-unwind-dw2.h"
 
+#include <FreeRTOSConfig.h>
 #include <FreeRTOS.h>
 #include "list.h"
 
@@ -592,7 +593,9 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
     rtems_rtl_obj_sym *rtl_sym = rtems_rtl_symbol_obj_find(obj, symname);
 
     if (rtl_sym) {
-       *((__uintcap_t *) where) = *(obj->captable + rtl_sym->capability);
+       void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
+
+       *((__uintcap_t *) where) = captable[rtl_sym->capability];
        return rtems_rtl_elf_rel_no_error;
     } else {
       rtems_rtl_set_error (EINVAL, "Couldn't find the symbol with CHERI_CAPABILITY reloc\n");

@@ -91,7 +91,9 @@ rtems_rtl_obj_alloc (void)
     vListInitialiseItem (&obj->link);
 
 #if __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
     obj->captable_free_slot = 1;
+#endif /* configCHERI_COMPARTMENTALIZATION_MODE */
 #endif
     /*
      * No valid format.
@@ -591,6 +593,7 @@ rtems_rtl_obj_find_section_by_mask (const rtems_rtl_obj* obj,
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
 bool
 rtems_rtl_obj_alloc_captable (rtems_rtl_obj* obj)
 {
@@ -611,6 +614,7 @@ rtems_rtl_obj_erase_captable (rtems_rtl_obj* obj)
 {
   rtems_rtl_alloc_del (RTEMS_RTL_ALLOC_OBJECT, obj->captable);
 }
+#endif /* configCHERI_COMPARTMENTALIZATION_MODE */
 #endif
 
 bool
@@ -1456,6 +1460,12 @@ rtems_rtl_obj_load (rtems_rtl_obj* obj)
       ff_fclose (fd);
       return false;
     }
+
+    obj->archive = rtems_rtl_archive_find(&rtems_rtl_data_unprotected()->archives, obj->aname);
+    if (obj->archive == NULL) {
+      printf("Failed to find an archive for that object\n");
+      return false;
+    }
   }
 
   /*
@@ -1511,11 +1521,13 @@ rtems_rtl_obj_load (rtems_rtl_obj* obj)
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
   if (!rtl_cherifreertos_compartment_set_obj(obj))
   {
     rtems_rtl_set_error (errno, "couldn't set an obj for a compartment");
     return false;
   }
+#endif /* configCHERI_COMPARTMENTALIZATION_MODE */
 #endif
 
    /*

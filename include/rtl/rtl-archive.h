@@ -31,6 +31,7 @@
 #define _RTEMS_RTL_ARCHIVE_H_
 
 #include <FreeRTOS.h>
+#include <FreeRTOSConfig.h>
 #include "list.h"
 
 #ifdef __cplusplus
@@ -86,7 +87,7 @@ typedef struct rtems_rtl_archive_symbols
  */
 typedef struct rtems_rtl_archive
 {
-  ListItem_t          node;     /**< Chain link. */
+  ListItem_t                node;     /**< Chain link. */
   const char*               name;     /**< Archive absolute path. */
   size_t                    size;     /**< Size of the archive. */
   UBaseType_t               mtime;    /**< Archive's last modified time. */
@@ -94,6 +95,12 @@ typedef struct rtems_rtl_archive
   rtems_rtl_archive_symbols symbols;  /**< Ranlib symbol table. */
   size_t                    refs;     /**< Loaded object modules. */
   uint32_t                  flags;    /**< Some flags. */
+#if configCHERI_COMPARTMENTALIZATION_MODE == 2
+  void**                   captable;           /* Capability table per library */
+  size_t                   captable_free_slot; /* The next free slot in cap table */
+  size_t                   caps_count;         /* The number of capabilities */
+  size_t                   comp_id;            /* ID of an archive compartment */
+#endif
 } rtems_rtl_archive;
 
 /**
@@ -190,6 +197,9 @@ bool rtems_rtl_obj_archive_find_obj (void*                   fd,
                                      UBaseType_t*            extended_names,
                                      rtems_rtl_archive_error error);
 
+rtems_rtl_archive*
+rtems_rtl_archive_find (rtems_rtl_archives* archives,
+                        const char*         path);
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

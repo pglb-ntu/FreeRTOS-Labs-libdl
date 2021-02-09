@@ -553,7 +553,15 @@ rtems_rtl_isymbol_obj_mint (rtems_rtl_obj* src_obj, rtems_rtl_obj* dest_obj, con
 
 #ifdef __CHERI_PURE_CAPABILITY__
   // Allocate a new cap slot in the interface captable and install it
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
   esym->capability = rtl_cherifreertos_captable_install_new_cap(dest_obj, *(src_obj->captable + sym->capability));
+
+#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+  if (src_obj->archive->comp_id != dest_obj->archive->comp_id)
+  {
+    esym->capability = rtl_cherifreertos_captable_install_new_cap(dest_obj, src_obj->archive->captable[sym->capability]);
+  }
+#endif /* configCHERI_COMPARTMENTALIZATION_MODE */
   if (!esym->capability) {
     rtems_rtl_set_error (ENOMEM, "Could not mint a new cap to the dest obj");
     return NULL;

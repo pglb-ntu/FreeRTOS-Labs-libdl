@@ -32,6 +32,7 @@
 #include "rtl-error.h"
 #include "rtl-string.h"
 
+#include <FreeRTOSConfig.h>
 #include <FreeRTOS.h>
 #include "semphr.h"
 
@@ -234,11 +235,21 @@ rtems_rtl_data_init (void)
       /*
        * Need to malloc the memory so the free does not complain.
        */
+      rtl->base->archive = rtems_rtl_alloc_new(RTEMS_RTL_ALLOC_OBJECT, sizeof(rtems_rtl_archive), true);
+      if (rtl->base->archive == NULL) {
+        printf("Error allocating an archive for the base image\n");
+        return false;
+      }
+
       rtl->base->aname = rtems_rtl_strdup ("freertos-kernel");
       rtl->base->oname = rtems_rtl_strdup ("freertos-kernel");
 
-#if __CHERI_PURE_CAPABILITY
+#if __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
       rtl->base->comp_id = configCOMPARTMENTS_NUM - 1;
+#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+      rtl->base->archive->comp_id = configCOMPARTMENTS_NUM - 1;
+#endif
 #endif
 
       /*

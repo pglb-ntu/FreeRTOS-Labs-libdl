@@ -270,7 +270,7 @@ rtems_rtl_unresolved_resolve_reloc (rtems_rtl_unresolv_rec* rec,
                  obj->oname);
 
         if (rtems_rtl_isymbol_obj_mint(obj, rec->rec.reloc.obj, rd->name_rec->rec.name.name)) {
-          if (rtems_rtl_trace (RTEMS_RTL_TRACE_UNRESOLVED))
+          if (rtems_rtl_trace (RTEMS_RTL_TRACE_CHERI))
             printf("rtl: unresolv: minted symbol %s from object: %s -> object: %s\n",
                    rd->name_rec->rec.name.name,
                    obj->oname,
