@@ -51,9 +51,11 @@ _rtld_linkmap_add (rtems_rtl_obj* obj)
   uint32_t         obj_num = obj->obj_num;
   int              i;
 
+#if DEBUG
   printf("rtld: gdb: %s 0x%xlu\n", obj->oname, obj->text_base);
+#endif
 
-#if __CHERI_PURE_CAPABILITY__
+#if __CHERI_PURE_CAPABILITY__ && DEBUG
   void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
   printf("%s's captable @ %p\n",  obj->oname, captable);
 #endif
