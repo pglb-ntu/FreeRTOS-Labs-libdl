@@ -1984,6 +1984,11 @@ rtems_rtl_elf_file_unload (rtems_rtl_obj* obj)
 {
   rtems_rtl_elf_arch_free (obj);
   rtems_rtl_elf_unwind_deregister (obj);
+
+#if configCHERI_COMPARTMENTALIZATION
+  rtl_freertos_compartment_close(obj);
+#endif /* configCHERI_COMPARTMENTALIZATION */
+
   return true;
 }
 

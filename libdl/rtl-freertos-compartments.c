@@ -83,6 +83,22 @@ void* rtl_freertos_compartment_open(const char *name)
 #endif
 }
 
+#if configCHERI_COMPARTMENTALIZATION
+bool rtl_freertos_compartment_close(rtems_rtl_obj* obj)
+{
+  #if configCHERI_COMPARTMENTALIZATION_MODE == 1
+    if (obj->captable) {
+      rtems_rtl_alloc_del(RTEMS_RTL_ALLOC_CAPTAB, obj->captable);
+    }
+  #elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+    if (obj->archive->captable) {
+      rtems_rtl_alloc_del(RTEMS_RTL_ALLOC_CAPTAB, obj->archive->captable);
+    }
+  #endif /* configCHERI_COMPARTMENTALIZATION_MODE */
+return true;
+}
+#endif
+
 size_t rtl_freertos_compartment_read(void* fd, void *buffer, UBaseType_t offset, size_t count)
 {
 #ifdef ipconfigUSE_FAT_LIBDL
