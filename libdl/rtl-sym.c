@@ -111,7 +111,8 @@ rtems_rtl_symbol_global_add (rtems_rtl_obj*       obj,
       return false;
     }
     ++count;
-    s += l + sizeof (unsigned long) + 1;
+    // 3 long words after the symbol name: value, size and type
+    s += l + sizeof (unsigned long) * 3 + 1;
   }
 
   /*
@@ -144,6 +145,28 @@ rtems_rtl_symbol_global_add (rtems_rtl_obj*       obj,
     return false;
   }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+  obj->captable = NULL;
+  if (!rtl_cherifreertos_captable_alloc(obj, count))
+  {
+    if (rtems_rtl_trace (RTEMS_RTL_TRACE_CHERI))
+      printf("rtl:cheri: Failed to alloc a global cap table for %s\n", obj->oname);
+
+    return 0;
+  }
+#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+  obj->archive->captable = NULL;
+  if (!rtl_cherifreertos_captable_archive_alloc(obj->archive, globals_count))
+  {
+    if (rtems_rtl_trace (RTEMS_RTL_TRACE_CHERI))
+      printf("rtl:cheri: Failed to alloc a global cap table for %s\n", obj->aname);
+
+    return 0;
+  }
+#endif /* configCHERI_COMPARTMENTALIZATION_MODE */
+#endif
+
   symbols = rtems_rtl_global_symbols ();
 
   s = 0;
@@ -152,23 +175,63 @@ rtems_rtl_symbol_global_add (rtems_rtl_obj*       obj,
   while ((s < size) && (esyms[s] != 0))
   {
     /*
-     * Copy the void* using a union and memcpy to avoid any strict aliasing or
+     * Copy the long using a union and memcpy to avoid any strict aliasing or
      * alignment issues. The variable length of the label and the packed nature
      * of the table means casting is not suitable.
      */
     union {
-      uint8_t data[sizeof (void*)];
-      void*   value;
-    } copy_voidp;
+      uint8_t data[sizeof (unsigned long) * 3];
+      unsigned long    value;
+    } copy_long;
     int b;
+
+    typedef struct {
+      unsigned long value;
+      unsigned long size;
+      unsigned long type;
+    } sym_t;
 
     sym->name = (const char*) &esyms[s];
     s += strlen (sym->name) + 1;
-    for (b = 0; b < sizeof (void*); ++b, ++s)
-      copy_voidp.data[b] = esyms[s];
-    sym->value = copy_voidp.value;
+    for (b = 0; b < sizeof (long) * 3; ++b, ++s)
+      copy_long.data[b] = esyms[s];
+    sym->value = copy_long.value;
+
+    sym_t *sym_details = (sym_t *) &copy_long.data;
+
+    sym->size = sym_details->size;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+      void *cap = NULL;
+      if (ELF_ST_TYPE(sym_details->type) == STT_OBJECT) {
+        cap = cheri_build_data_cap((ptraddr_t) sym_details->value,
+        sym_details->size,
+        __CHERI_CAP_PERMISSION_GLOBAL__ | \
+        __CHERI_CAP_PERMISSION_PERMIT_LOAD__ | \
+        __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
+        __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
+        __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
+      } else if (ELF_ST_TYPE(sym_details->type) == STT_FUNC) {
+        cap = cheri_build_code_cap_unbounded((ptraddr_t) sym_details->value,
+        __CHERI_CAP_PERMISSION_ACCESS_SYSTEM_REGISTERS__ | \
+        __CHERI_CAP_PERMISSION_GLOBAL__ | \
+        __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__ | \
+        __CHERI_CAP_PERMISSION_PERMIT_LOAD__ | \
+        __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
+        __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
+        __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
+      }
+
+      sym->capability = rtl_cherifreertos_captable_install_new_cap(obj, cap);
+      if (!sym->capability) {
+        if (rtems_rtl_trace (RTEMS_RTL_TRACE_CHERI))
+          printf("rtl:cheri: Failed to install a new cap in %s captable\n", obj->oname);
+        return 0;
+      }
+#endif
+
     if (rtems_rtl_trace (RTEMS_RTL_TRACE_GLOBAL_SYM))
-      printf ("rtl: esyms: %s -> %8p\n", sym->name, sym->value);
+      printf ("rtl: esyms: %s -> 0x%x\n", sym->name, sym->value);
     if (rtems_rtl_symbol_global_find (sym->name) == NULL)
       rtems_rtl_symbol_global_insert (symbols, sym);
     ++sym;
