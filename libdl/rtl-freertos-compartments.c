@@ -36,10 +36,12 @@ extern void *pvAlmightyDataCap;
 extern void *pvAlmightyCodeCap;
 #endif
 
+#if 0
 extern Elf_Sym*  __symtab_start;
 extern Elf_Sym*  __symtab_end;
 extern char*  __strtab_start;
 extern char*  __strtab_end;
+#endif
 
 Compartment_t comp_list[configCOMPARTMENTS_NUM];
 static uint32_t comp_id_free = 0;
@@ -135,6 +137,7 @@ void
 rtems_rtl_symbol_global_insert (rtems_rtl_symbols* symbols,
                                 rtems_rtl_obj_sym* symbol);
 
+#if 0
 size_t
 rtl_freertos_global_symbols_add(rtems_rtl_obj* obj) {
   Elf_Sym*  symtab_start = &__symtab_start;
@@ -245,6 +248,7 @@ rtl_freertos_global_symbols_add(rtems_rtl_obj* obj) {
 
   return globals_count;
 }
+#endif
 
 uint32_t rtl_cherifreertos_compartment_get_free_compid(void) {
 

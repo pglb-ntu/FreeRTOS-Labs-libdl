@@ -70,7 +70,7 @@ void rtems_rtl_base_global_syms_init (void) __attribute__ ((weak));
 void
 rtems_rtl_base_global_syms_init (void)
 {
-  rtl_freertos_global_symbols_add(rtl->base);
+  //rtl_freertos_global_symbols_add(rtl->base);
 }
 
 static bool
