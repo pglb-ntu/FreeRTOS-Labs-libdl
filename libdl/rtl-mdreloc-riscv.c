@@ -631,8 +631,8 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
 
 #if __riscv_xlen == 64
       uint32_t lc_inst = (0x2 << 12) | 0xf;
-#else
-#error "RV32 libdl isn't supported yet"
+#elif __riscv_xlen == 32
+      uint32_t lc_inst = (0x3 << 12) | 0x3;
 #endif
 
       lc_inst |= (tmpreg << 7);
