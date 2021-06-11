@@ -56,7 +56,10 @@ dlopen (const char* name, int mode)
     return NULL;
 
   _rtld_debug.r_state = RT_ADD;
-  _rtld_debug_state ();
+
+  #if configLIBDL_GDB_DEBUG
+    _rtld_debug_state ();
+  #endif
 
   if (name)
     obj = rtems_rtl_load (name, mode);
@@ -64,7 +67,10 @@ dlopen (const char* name, int mode)
     obj = rtems_rtl_baseimage ();
 
   _rtld_debug.r_state = RT_CONSISTENT;
-  _rtld_debug_state();
+
+  #if configLIBDL_GDB_DEBUG
+    _rtld_debug_state ();
+  #endif
 
   rtems_rtl_unlock ();
 
@@ -88,12 +94,18 @@ dlclose (void* handle)
   }
 
   _rtld_debug.r_state = RT_DELETE;
-  _rtld_debug_state ();
+
+  #if configLIBDL_GDB_DEBUG
+    _rtld_debug_state ();
+  #endif
 
   r = rtems_rtl_unload (obj) ? 0 : -1;
 
   _rtld_debug.r_state = RT_CONSISTENT;
-  _rtld_debug_state ();
+
+  #if configLIBDL_GDB_DEBUG
+    _rtld_debug_state ();
+  #endif
 
   rtems_rtl_unlock ();
 
