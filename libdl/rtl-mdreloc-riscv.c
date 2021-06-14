@@ -623,23 +623,11 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
       short tmpreg = (read16le(where) & 0xf80) >> 7;
       uint32_t cincoff = read32le(where + 1);
 
-      // lui tmpreg, #hi20(cap_addr)
-      write32le(where, (hi << 12) | (tmpreg << 7) | read32le(where));
-
-      // cincoffset ctmpreg, cgp, tmpreg
-      write32le((where + 1), (tmpreg << 20) | (tmpreg << 7) | cincoff);
-
-#if __riscv_xlen == 64
-      uint32_t lc_inst = (0x2 << 12) | 0xf;
-#elif __riscv_xlen == 32
-      uint32_t lc_inst = (0x3 << 12) | 0x3;
-#endif
-
-      lc_inst |= (tmpreg << 7);
-      lc_inst |= (tmpreg << 15);
-
+      // lui gpr, #hi20(cap_addr)
+      write32le(where, (hi << 12) | read32le(where));
+      // cincoffset ctmpreg, cgp, gpr
       // lc ctmpreg, #lo12(cap_addr)(ctmpreg)
-      write32le((where + 2), (lo << 20) | (lc_inst));
+      write32le((where + 2), (lo << 20) | read32le(where + 2));
 
       return rtems_rtl_elf_rel_no_error;
     } else {
