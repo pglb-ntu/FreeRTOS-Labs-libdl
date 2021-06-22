@@ -157,7 +157,7 @@ rtems_rtl_symbol_global_add (rtems_rtl_obj*       obj,
   }
 #elif configCHERI_COMPARTMENTALIZATION_MODE == 2
   obj->archive->captable = NULL;
-  if (!rtl_cherifreertos_captable_archive_alloc(obj->archive, globals_count))
+  if (!rtl_cherifreertos_captable_archive_alloc(obj->archive, count))
   {
     if (rtems_rtl_trace (RTEMS_RTL_TRACE_CHERI))
       printf("rtl:cheri: Failed to alloc a global cap table for %s\n", obj->aname);
