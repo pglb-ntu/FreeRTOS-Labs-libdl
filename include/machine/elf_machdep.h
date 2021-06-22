@@ -127,6 +127,9 @@
 #define R_RISCV_CHERI_TPREL_CINCOFFSET         196
 #define R_RISCV_CHERI_TLS_IE_CAPTAB_PCREL_HI20 197
 #define R_RISCV_CHERI_TLS_GD_CAPTAB_PCREL_HI20 198
+#define R_RISCV_CHERI_CJAL                     199
+#define R_RISCV_CHERI_CCALL                    200
+#define R_RISCV_CHERI_RVC_CJUMP                201
 #define R_RISCV_CHERI_CAPTAB_FREERTOS_GPREL    255
 #endif
 
