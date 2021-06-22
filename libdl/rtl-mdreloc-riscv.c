@@ -637,6 +637,14 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
   }
   break;
 
+  case R_TYPE(CHERI_CJAL):
+  case R_TYPE(CHERI_RVC_CJUMP):
+  case R_TYPE(CHERI_CCALL): {
+    printf("Warning: Unimplemented CHERI call/jump %d reloc\n", ELF_R_TYPE(rela->r_info));
+    return rtems_rtl_elf_rel_no_error;
+  }
+
+  break;
 #endif
   default:
     rtems_rtl_set_error (EINVAL,
