@@ -33,6 +33,9 @@ rtems_rtl_set_error (int error, const char* format, ...)
   va_start (ap, format);
   rtl->last_errno = error;
   vsnprintf (rtl->last_error, sizeof (rtl->last_error), format, ap);
+#if DEBUG
+  printf(format, ap);
+#endif
   rtems_rtl_unlock ();
   va_end (ap);
 }
