@@ -20,6 +20,7 @@
 #include "rtl-error.h"
 
 #include <FreeRTOS.h>
+#include "timers.h"
 
 #if __riscv_xlen == 32
 #define ELFSIZE 32
@@ -659,5 +660,236 @@ void* rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t comp
 
   /* Create cap and install it */
   return &tramp_cap_instance[3];
+}
+
+void rtl_cherifreertos_compartment_register_faultHandler(BaseType_t compid, void* handler)
+{
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
+
+  if (obj == NULL) {
+    printf("Couldn't find an object for compid %d\n", compid);
+    return;
+  }
+
+  obj->faultHandler = handler;
+#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+  rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
+
+  if (archive == NULL) {
+    printf("Couldn't find an archive for compid %d\n", compid);
+    return;
+  }
+
+  archive->faultHandler = handler;
+#endif
+}
+
+bool
+rtl_cherifreertos_compartment_faultHandler(BaseType_t compid) {
+  BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
+  PendedFunction_t func = NULL;
+
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
+
+  if (obj == NULL) {
+    printf("Couldn't find an object for compid %d\n", compid);
+    return false;
+  }
+
+  if (obj->faultHandler == NULL) {
+    printf("No attached fault handler for compartment %s, returning to caller directely\n", obj->oname);
+    return false;
+  }
+
+  func = (PendedFunction_t) obj->faultHandler;
+#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+  rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
+
+  if (archive == NULL) {
+    printf("Couldn't find an archive for compid %d\n", compid);
+    return false;
+  }
+
+  if (archive->faultHandler == NULL) {
+    printf("No fault handler for compartment %s, returning to caller directely\n", archive->name);
+    return false;
+  }
+
+  func = (PendedFunction_t) archive->faultHandler;
+#endif
+
+  // Notify the daemon task to run the per-compartment fault handler in its context
+  if (func)
+    xTimerPendFunctionCallFromISR(func, NULL, compid, &pxHigherPriorityTaskWoken);
+
+  return (bool) pxHigherPriorityTaskWoken;
+}
+
+bool
+rtl_cherifreertos_compartment_init_resources (BaseType_t compid)
+{
+  FreeRTOSCompartmentResources_t* pCompResTable = rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT,
+                                                   sizeof (FreeRTOSCompartmentResources_t),
+                                                   true);
+  if (!pCompResTable) {
+    printf ("no memory for resources table");
+    return false;
+  }
+
+  pCompResTable->buckets = rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT,
+                                          FREERTOS_OBJ_COUNT * sizeof (List_t),
+                                          true);
+  if (!pCompResTable->buckets)
+  {
+    printf ("no memory for resouces table buckets");
+    return false;
+  }
+
+  pCompResTable->nbuckets = FREERTOS_OBJ_COUNT;
+
+  for (int buckets = 0; buckets < pCompResTable->nbuckets; ++buckets)
+    vListInitialise (&pCompResTable->buckets[buckets]);
+
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
+
+  if (obj == NULL) {
+    printf("Couldn't find an object for compid %d\n", compid);
+    return false;
+  }
+
+  obj->pCompResTable = pCompResTable;
+#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+  rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
+
+  if (archive == NULL) {
+    printf("Couldn't find an archive for compid %d\n", compid);
+    return false;
+  }
+
+  archive->pCompResTable = pCompResTable;
+#endif
+
+  return true;
+}
+
+void
+rtl_cherifreertos_compartment_add_resource(BaseType_t compid,
+                                           FreeRTOSResource_t xResource)
+{
+  FreeRTOSCompartmentResources_t* pCompResTable = NULL;
+
+  FreeRTOSResource_t* newRes = pvPortMalloc (sizeof (FreeRTOSResource_t));
+
+  if (newRes == NULL) {
+    printf("Failed to add %d resource to compartment %d\n", xResource.type, compid);
+    return;
+  }
+
+  newRes->handle = xResource.handle;
+  newRes->type= xResource.type;
+
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
+
+  pCompResTable = (FreeRTOSCompartmentResources_t*) obj->pCompResTable;
+#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+  rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
+
+  pCompResTable = (FreeRTOSCompartmentResources_t*) archive->pCompResTable;
+#endif
+
+  if (pCompResTable == NULL) {
+    printf("No resources table found for compartment %d\n", compid);
+    return;
+  }
+
+  vListInsertEnd (&pCompResTable->buckets[xResource.type],
+                  &newRes->node);
+}
+
+void
+rtl_cherifreertos_compartment_remove_resource(BaseType_t compid,
+                                              FreeRTOSResource_t xResource)
+{
+  FreeRTOSCompartmentResources_t* pCompResTable = NULL;
+
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
+
+  pCompResTable = (FreeRTOSCompartmentResources_t*) obj->pCompResTable;
+#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+  rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
+
+  pCompResTable = (FreeRTOSCompartmentResources_t*) archive->pCompResTable;
+#endif
+
+  if (pCompResTable == NULL) {
+    printf("No resources table found for compartment %d\n", compid);
+    return;
+  }
+
+  List_t* resouceList = &pCompResTable->buckets[xResource.type];
+
+  ListItem_t* node = listGET_HEAD_ENTRY (resouceList);
+
+  while (listGET_END_MARKER (resouceList) != node)
+  {
+    FreeRTOSResource_t* res = (FreeRTOSResource_t *) node;
+
+    if (res->handle == xResource.handle) {
+      uxListRemove(res);
+      return;
+    }
+
+    node = listGET_NEXT (node);
+  }
+}
+
+void
+rtl_cherifreertos_compartment_revoke_tasks(FreeRTOSCompartmentResources_t* pCompResTable) {
+  if (pCompResTable == NULL) {
+    printf("Invalid resource table to revoke tasks from");
+    return;
+  }
+
+  List_t* resouceList = &pCompResTable->buckets[FREERTOS_TASK];
+  ListItem_t* node = listGET_HEAD_ENTRY (resouceList);
+
+  while (listGET_END_MARKER (resouceList) != node)
+  {
+    FreeRTOSResource_t* res = (FreeRTOSResource_t *) node;
+
+    uxListRemove(res);
+    vTaskDelete(res->handle);
+
+    node = listGET_NEXT (node);
+  }
+}
+
+void
+rtl_cherifreertos_compartment_revoke_resources(BaseType_t compid) {
+FreeRTOSCompartmentResources_t* pCompResTable = NULL;
+
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
+
+  pCompResTable = (FreeRTOSCompartmentResources_t*) obj->pCompResTable;
+#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+  rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
+
+  pCompResTable = (FreeRTOSCompartmentResources_t*) archive->pCompResTable;
+#endif
+
+  if (pCompResTable == NULL) {
+    printf("No resources table found for compartment %d\n", compid);
+    return;
+  }
+
+  rtl_cherifreertos_compartment_revoke_tasks(pCompResTable);
+
+  // TODO: Revoke other FreeRTOS resources as well
 }
 #endif

@@ -1527,6 +1527,15 @@ rtems_rtl_obj_load (rtems_rtl_obj* obj)
     rtems_rtl_set_error (errno, "couldn't set an obj for a compartment");
     return false;
   }
+
+  if (!rtl_cherifreertos_compartment_init_resources (obj->comp_id))
+   return false;
+
+  rtems_rtl_obj_sym* sym = rtems_rtl_lsymbol_obj_find (obj, "CheriFreeRTOS_FaultHandler");
+
+  if (sym) {
+    rtl_cherifreertos_compartment_register_faultHandler(obj->comp_id, obj->captable[sym->capability]);
+  }
 #endif /* configCHERI_COMPARTMENTALIZATION_MODE */
 #endif
 
@@ -1539,7 +1548,7 @@ rtems_rtl_obj_load (rtems_rtl_obj* obj)
     return false;
   }
 
-  ff_fclose (fd);
+  // ff_fclose (fd);
 
   return true;
 }

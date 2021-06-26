@@ -257,6 +257,8 @@ struct rtems_rtl_obj
   size_t              captable_free_slot; /* The next free slot in cap table */
   size_t              caps_count;         /* The number of capabilities */
   size_t              comp_id;            /* ID of an object compartment */
+  bool                (*faultHandler)(void* , uint32_t); /* Compartment fault handler */
+  void*               pCompResTable /* Per Compartment FreeRTOS resource table */
 #endif
 };
 

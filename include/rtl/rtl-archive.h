@@ -100,6 +100,8 @@ typedef struct rtems_rtl_archive
   size_t                   captable_free_slot; /* The next free slot in cap table */
   size_t                   caps_count;         /* The number of capabilities */
   size_t                   comp_id;            /* ID of an archive compartment */
+  bool                     (*faultHandler)(void*, uint32_t); /* Compartment fault handler */
+  void*                    pCompResTable /* Per Compartment FreeRTOS resource table */
 #endif
 } rtems_rtl_archive;
 
@@ -200,6 +202,16 @@ bool rtems_rtl_obj_archive_find_obj (void*                   fd,
 rtems_rtl_archive*
 rtems_rtl_archive_find (rtems_rtl_archives* archives,
                         const char*         path);
+
+/**
+ * Selectively load an object from an archive without relying on the dependency
+ * symbol resolving to load an object. This is helpful to always load an object
+ * that does not have other dynamically loaded objects that rely on it-- fault
+ * handlers is an example.
+ */
+rtems_rtl_archive_search
+rtems_rtl_archive_single_obj_load(rtems_rtl_archive* archive, size_t offset);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

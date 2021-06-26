@@ -16,6 +16,29 @@ typedef struct compartment {
   uint64_t    id;
 } Compartment_t;
 
+typedef enum resource {
+  FREERTOS_TASK,
+  FREERTOS_QUEUE,
+  FREERTOS_TIMER,
+  FREERTOS_EVENT,
+  FREERTOS_STREAMBUFF,
+  FREERTOS_MSGBUFF,
+  FREERTOS_MEM,
+
+  FREERTOS_OBJ_COUNT
+} FreeRTOSResourceType_t;
+
+typedef struct ResourceObj {
+  ListItem_t                node;
+  void*                     handle;
+  FreeRTOSResourceType_t    type;
+} FreeRTOSResource_t;
+
+typedef struct resouceTable {
+  List_t      *buckets;
+  size_t      nbuckets;
+} FreeRTOSCompartmentResources_t;
+
 extern Compartment_t comp_list[configCOMPARTMENTS_NUM];
 extern char comp_strtab[configCOMPARTMENTS_NUM][configMAXLEN_COMPNAME];
 
@@ -159,5 +182,41 @@ rtl_cherifreertos_compartment_obj_get_captable(rtems_rtl_obj* obj);
  */
 void*
 rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t compid);
+
+/**
+ * Register a fault handler for a compartment passed in handler.
+ */
+void
+rtl_cherifreertos_compartment_register_faultHandler(BaseType_t compid, void* handler);
+
+/**
+ * Call a fault handler of a compartment.
+ * Return true if a reschedule is required
+ */
+bool
+rtl_cherifreertos_compartment_faultHandler(BaseType_t compid);
+
+/**
+ * Initialize data structures needed to bookkeep run-time allocated FreeRTOS
+ * resourced per compartment.
+ */
+bool
+rtl_cherifreertos_compartment_init_resources (BaseType_t compid);
+
+/**
+ * Add/Delete FreeRTOS allocated resoucres to a compartment.
+ */
+void
+rtl_cherifreertos_compartment_add_resource(BaseType_t compid,
+                                           FreeRTOSResource_t xResource);
+void
+rtl_cherifreertos_compartment_remove_resource(BaseType_t compid,
+                                              FreeRTOSResource_t xResource);
+
+/**
+ * Iterate over all compartment-owned resources and revoke them
+ */
+void
+rtl_cherifreertos_compartment_revoke_resources(BaseType_t compid);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif

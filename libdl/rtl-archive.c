@@ -831,7 +831,23 @@ rtems_rtl_archive_loader (rtems_rtl_archive* archive, void* data)
     return false;
   }
 
+  if (!rtl_cherifreertos_compartment_init_resources (archive->comp_id))
+    return false;
+
   archive->captable_free_slot = 1;
+
+  /* Search for a per-archive fault handler */
+  rtems_rtl_archive_obj_data search = {
+    .symbol  = "CheriFreeRTOS_FaultHandler",
+    .archive = archive,
+    .offset  = 0
+  };
+
+  rtems_rtl_archive_obj_finder(archive, &search);
+
+  if (search.offset) {
+      rtems_rtl_archive_single_obj_load(archive, search.offset);
+  }
 #endif /* configCHERI_COMPARTMENTALIZATION_MODE */
 
     ++(*loaded);
@@ -1067,6 +1083,104 @@ rtems_rtl_archive_load (rtems_rtl_archives* archives, const char* name)
 }
 
 rtems_rtl_archive_search
+rtems_rtl_archive_single_obj_load (rtems_rtl_archive* archive, size_t obj_offset)
+{
+  List_t*              pending;
+  void*                fd;
+
+  pending = rtems_rtl_pending_unprotected ();
+  rtems_rtl_obj* obj = rtems_rtl_obj_alloc ();
+  if (obj == NULL)
+  {
+    if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
+      printf ("rtl: archive: alloc: no memory: %s\n",
+              archive->name);
+    return rtems_rtl_archive_search_error;
+  }
+
+  obj->aname = rtems_rtl_strdup (archive->name);
+
+#ifdef ipconfigUSE_FAT_LIBDL
+  fd = ff_fopen (obj->aname, "r");
+  if (fd == NULL)
+#else
+  fd = open (obj->aname, O_RDONLY);
+  if (fd < 0)
+#endif
+  {
+    if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
+      printf ("rtl: archive: load: open error: %s: %s\n",
+              obj->aname, strerror (errno));
+    rtems_rtl_obj_free (obj);
+    return rtems_rtl_archive_search_error;
+  }
+
+  obj->oname = NULL;
+  obj->ooffset = obj_offset;
+
+  if (!rtems_rtl_obj_archive_find_obj (fd,
+                                       archive->size,
+                                       &obj->oname,
+                                       &obj->ooffset,
+                                       &obj->fsize,
+                                       &archive->enames,
+                                       rtems_rtl_archive_set_error))
+  {
+    if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
+      printf ("rtl: archive: load: load error: %s:%s\n",
+              obj->aname, obj->oname);
+#ifdef ipconfigUSE_FAT_LIBDL
+    ff_fclose (fd);
+#else
+    close (fd);
+#endif
+    rtems_rtl_obj_free (obj);
+    return rtems_rtl_archive_search_error;
+  }
+
+  obj->fname = rtems_rtl_strdup (obj->aname);
+  obj->ooffset -= RTEMS_RTL_AR_FHDR_SIZE;
+  obj->fsize = archive->size;
+
+#ifdef ipconfigUSE_FAT_LIBDL
+  ff_fclose (fd);
+#else
+  close (fd);
+#endif
+
+  if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
+    printf ("rtl: archive: loading: %s:%s@0x%08jx size:%zu\n",
+            obj->aname, obj->oname, obj->ooffset, obj->fsize);
+
+  vListInitialiseItem (&obj->link);
+  vListInsertEnd (pending, &obj->link);
+  //rtems_chain_append (pending, &obj->link);
+
+  if (!rtems_rtl_obj_load (obj))
+  {
+    if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
+      printf ("rtl: archive: loading: error: %s:%s@0x%08jx: %s\n",
+              obj->aname, obj->oname, obj->ooffset,
+              rtems_rtl_last_error_unprotected ());
+    uxListRemove (&obj->link);
+    rtems_rtl_obj_free (obj);
+    rtems_rtl_obj_caches_flush ();
+    return rtems_rtl_archive_search_error;
+  }
+
+  obj->archive = archive;
+
+  rtems_rtl_obj_caches_flush ();
+
+  if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
+    printf ("rtl: archive: loading: loaded: %s:%s@0x%08jx\n",
+            obj->aname, obj->oname, obj->ooffset);
+
+  return rtems_rtl_archive_search_loaded;
+
+}
+
+rtems_rtl_archive_search
 rtems_rtl_archive_obj_load (rtems_rtl_archives* archives,
                             const char*         symbol,
                             bool                load)
@@ -1120,94 +1234,7 @@ rtems_rtl_archive_obj_load (rtems_rtl_archives* archives,
     return rtems_rtl_archive_search_found;
   }
 
-  obj = rtems_rtl_obj_alloc ();
-  if (obj == NULL)
-  {
-    if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
-      printf ("rtl: archive: alloc: no memory: %s\n",
-              search.archive->name);
-    return rtems_rtl_archive_search_error;
-  }
-
-  obj->aname = rtems_rtl_strdup (search.archive->name);
-
-#ifdef ipconfigUSE_FAT_LIBDL
-  fd = ff_fopen (obj->aname, "r");
-  if (fd == NULL)
-#else
-  fd = open (obj->aname, O_RDONLY);
-  if (fd < 0)
-#endif
-  {
-    if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
-      printf ("rtl: archive: load: open error: %s: %s\n",
-              obj->aname, strerror (errno));
-    rtems_rtl_obj_free (obj);
-    return rtems_rtl_archive_search_error;
-  }
-
-  obj->oname = NULL;
-  obj->ooffset = search.offset;
-
-  if (!rtems_rtl_obj_archive_find_obj (fd,
-                                       search.archive->size,
-                                       &obj->oname,
-                                       &obj->ooffset,
-                                       &obj->fsize,
-                                       &search.archive->enames,
-                                       rtems_rtl_archive_set_error))
-  {
-    if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
-      printf ("rtl: archive: load: load error: %s:%s\n",
-              obj->aname, obj->oname);
-#ifdef ipconfigUSE_FAT_LIBDL
-    ff_fclose (fd);
-#else
-    close (fd);
-#endif
-    rtems_rtl_obj_free (obj);
-    return rtems_rtl_archive_search_error;
-  }
-
-  obj->fname = rtems_rtl_strdup (obj->aname);
-  obj->ooffset -= RTEMS_RTL_AR_FHDR_SIZE;
-  obj->fsize = search.archive->size;
-
-#ifdef ipconfigUSE_FAT_LIBDL
-  ff_fclose (fd);
-#else
-  close (fd);
-#endif
-
-  if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
-    printf ("rtl: archive: loading: %s:%s@0x%08jx size:%zu\n",
-            obj->aname, obj->oname, obj->ooffset, obj->fsize);
-
-  vListInitialiseItem (&obj->link);
-  vListInsertEnd (pending, &obj->link);
-  //rtems_chain_append (pending, &obj->link);
-
-  if (!rtems_rtl_obj_load (obj))
-  {
-    if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
-      printf ("rtl: archive: loading: error: %s:%s@0x%08jx: %s\n",
-              obj->aname, obj->oname, obj->ooffset,
-              rtems_rtl_last_error_unprotected ());
-    uxListRemove (&obj->link);
-    rtems_rtl_obj_free (obj);
-    rtems_rtl_obj_caches_flush ();
-    return rtems_rtl_archive_search_error;
-  }
-
-  obj->archive = search.archive;
-
-  rtems_rtl_obj_caches_flush ();
-
-  if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
-    printf ("rtl: archive: loading: loaded: %s:%s@0x%08jx\n",
-            obj->aname, obj->oname, obj->ooffset);
-
-  return rtems_rtl_archive_search_loaded;
+  return rtems_rtl_archive_single_obj_load(search.archive, search.offset);
 }
 
 bool

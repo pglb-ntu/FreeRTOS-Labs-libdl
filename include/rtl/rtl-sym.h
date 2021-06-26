@@ -204,6 +204,9 @@ rtems_rtl_isymbol_obj_mint (rtems_rtl_obj* src_obj,
 rtems_rtl_obj_sym* rtems_rtl_symbol_obj_find_namevalue (rtems_rtl_obj* obj,
                                               const char*    name,
                                               UBaseType_t    value);
+
+rtems_rtl_obj_sym*
+rtems_rtl_lsymbol_obj_find(rtems_rtl_obj* obj, const char* name);
 /**
  * Find and extract a symbol given the symbol label in the local object file.
  * The symbol is only extracted from the locals list.
