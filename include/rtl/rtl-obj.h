@@ -258,7 +258,7 @@ struct rtems_rtl_obj
   size_t              caps_count;         /* The number of capabilities */
   size_t              comp_id;            /* ID of an object compartment */
   bool                (*faultHandler)(void* , uint32_t); /* Compartment fault handler */
-  void*               pCompResTable /* Per Compartment FreeRTOS resource table */
+  void*               pCompResTable; /* Per Compartment FreeRTOS resource table */
 #endif
 };
 

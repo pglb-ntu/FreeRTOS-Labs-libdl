@@ -218,5 +218,17 @@ rtl_cherifreertos_compartment_remove_resource(BaseType_t compid,
  */
 void
 rtl_cherifreertos_compartment_revoke_resources(BaseType_t compid);
+
+/**
+ * Trace the stack and function calls from a given @pc across CHERI compartments
+ * and print a backtrace of that, including compartment switches.
+ *
+ * @param pc: The start pc to backtrace from
+ * @param sp: The leaf stack pointer for @pc
+ * @param ra: Return address of the current function (in case it is a leaf one)
+ * @param xCompID: Current compartment ID for @pc when called
+ */
+void*
+rtl_cherifreertos_compartment_backtrace(void* pc, void* sp, void* ra, size_t xCompID);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif

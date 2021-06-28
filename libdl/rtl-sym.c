@@ -276,40 +276,6 @@ rtems_rtl_symbol_global_find (const char* name)
   return NULL;
 }
 
-void*
-rtems_rtl_symbol_global_find_by_address (size_t target_pc)
-{
-  rtems_rtl_symbols*   symbols;
-  uint_fast32_t        hash;
-  List_t* bucket;
-  ListItem_t*    node;
-  size_t sym_addr = 0;
-
-  symbols = rtems_rtl_global_symbols ();
-  rtems_rtl_obj* obj = rtems_rtl_baseimage();
-
-  for (int i = 0; i < symbols->nbuckets; i++) {
-    bucket = &symbols->buckets[i];
-    node = listGET_HEAD_ENTRY (bucket);
-    while (listGET_END_MARKER (bucket) != node)
-    {
-      rtems_rtl_obj_sym* sym = (rtems_rtl_obj_sym*) node;
-
-      sym_addr = (size_t) sym->value;
-
-      if ( (target_pc >= sym_addr) && (target_pc < (sym_addr + sym->size)))
-      {
-          printf("%s0x%x: %s%s%s<%s+%d>\n", KBLU, (size_t) target_pc, KGRN, obj->oname, KYEL, sym->name, target_pc - sym_addr);
-          return obj->captable[sym->capability];
-      }
-
-      node = listGET_NEXT (node);
-    }
-  }
-
-  return NULL;
-}
-
 static int
 rtems_rtl_symbol_obj_compare (const void* a, const void* b)
 {
@@ -678,15 +644,48 @@ rtems_rtl_isymbol_obj_mint (rtems_rtl_obj* src_obj, rtems_rtl_obj* dest_obj, con
   return esym;
 }
 
+#if configCHERI_STACK_TRACE
+static void*
+rtems_rtl_symbol_global_find_by_address (size_t target_pc)
+{
+  rtems_rtl_symbols*   symbols;
+  List_t* bucket;
+  ListItem_t*    node;
+  size_t sym_addr = 0;
+
+  symbols = rtems_rtl_global_symbols ();
+  rtems_rtl_obj* obj = rtems_rtl_baseimage();
+
+  for (int i = 0; i < symbols->nbuckets; i++) {
+    bucket = &symbols->buckets[i];
+    node = listGET_HEAD_ENTRY (bucket);
+    while (listGET_END_MARKER (bucket) != node)
+    {
+      rtems_rtl_obj_sym* sym = (rtems_rtl_obj_sym*) node;
+
+      sym_addr = (size_t) sym->value;
+
+      if ( (target_pc >= sym_addr) && (target_pc < (sym_addr + sym->size)))
+      {
+          printf("%s0x%x: %s%s%s<%s+%d>\n", KBLU, (size_t) target_pc, KGRN, obj->oname, KYEL, sym->name, target_pc - sym_addr);
+          return obj->captable[sym->capability];
+      }
+
+      node = listGET_NEXT (node);
+    }
+  }
+
+  return NULL;
+}
+
 void*
-rtems_rtl_symbol_find_by_address(void* pc, void* sp, void* ret_reg, size_t xCompID) {
+rtl_cherifreertos_compartment_backtrace(void* pc, void* sp, void* ret_reg, size_t xCompID) {
 
   rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(xCompID);
   rtems_rtl_obj_sym* sym;
   size_t             s;
   size_t target_pc = (size_t) pc;
   size_t sym_addr = 0;
-  const char *func_name = NULL;
   void* func_addr = NULL;
 
   if (obj == NULL) {
@@ -695,83 +694,105 @@ rtems_rtl_symbol_find_by_address(void* pc, void* sp, void* ret_reg, size_t xComp
   }
 
   printf("%s", KYEL);
+
+  // Search FreeRTOS kernel's symtab
   func_addr = rtems_rtl_symbol_global_find_by_address((size_t) pc);
 
-  for (s = 0, sym = obj->global_table; s < obj->global_syms; ++s, ++sym) {
+  // Search object compartment's global symols
+  for (s = 0, sym = obj->global_table; func_addr == NULL && s < obj->global_syms; ++s, ++sym) {
     sym_addr = sym->value;
     if ( target_pc >= sym_addr && target_pc < sym_addr + sym->size) {
       printf("%s0x%x: %s%s%s<%s+%d>\n", KBLU, (size_t) pc, KGRN, obj->oname, KYEL, sym->name, pc - sym->value);
       func_addr = sym->value;
+      break;
     }
   }
 
-  for (s = 0, sym = obj->local_table; s < obj->local_syms; ++s, ++sym) {
+  // Search object compartment's local symols
+  for (s = 0, sym = obj->local_table; func_addr == NULL && s < obj->local_syms; ++s, ++sym) {
     sym_addr = sym->value;
     if ( target_pc >= sym_addr && target_pc < sym_addr + sym->size) {
       printf("%s0x%x: %s%s%s<%s+%d>\n", KBLU, (size_t) pc, KGRN, obj->oname, KYEL, sym->name, pc - sym->value);
-      //printf("%s+%d ()\n", sym->name, pc - sym->value);
       func_addr = sym->value;
+      break;
     }
   }
 
+  // Found a function symbol for the target PC
   if (func_addr) {
-    // Get frame size
-    func_addr = cheri_build_data_cap((size_t) func_addr, 0x1000, 0xfffff);
-    int32_t instruction;
-    memcpy(&instruction, func_addr, 4);
-    size_t frame_size = (instruction >> 20) * -1;
-    uint32_t opcode = instruction & ((0x1 << 12) | 0x7f);
-    uint32_t cincoffimm = (0x1 << 12) | 0x5b;
 
-    pc = cheri_build_data_cap((size_t) pc, 0x1000, 0xfffff);
+    // Build a new cap for a function symbol, just need to read the first instruction
+    func_addr = cheri_build_data_cap((size_t) func_addr, 16, __CHERI_CAP_PERMISSION_PERMIT_LOAD__);
 
-    void* csp;
-    void* cra;
+    // Read the first instruction of the function to help walk/unwind the stack
+    int32_t func_instruction;
+    memcpy(&func_instruction, func_addr, 4);
 
-    if (opcode == cincoffimm) {
-       csp = sp + frame_size;
-       cra = (void *) *((uintcap_t *) (csp - sizeof(void *)));
-    } else { // Leaf functions not setting up a stack frame (> O1)
-       csp = sp;
-       cra = ret_reg;
+    size_t frame_size = 0;
+    uint32_t func_opcode = func_instruction & ((0x1 << 12) | 0x7f);
+    uint32_t cincoffimm_opcode = (0x1 << 12) | 0x5b;
+    void* prev_csp;
+    void* prev_cra;
+    uint32_t prev_cra_instruction;
+    size_t prevCompID = xCompID;
+    // FIXME for CHERI-RV32
+    uint32_t tramp_switch_instructions[] = {0x03012d8f,  // inter-compartment return instruction (load_x cs0, 13 * portWORD_SIZE(csp))
+                                            0x0d01240f}; // intra-compartment return instruction (load_x cs11, 3 * portWORD_SIZE(csp))
+
+    // For non-leaf function, the very first instruction is a cincoffset of csp
+    // to setup the stack frame
+    if (func_opcode == cincoffimm_opcode) {
+       // decode frame size
+       frame_size = (func_instruction >> 20) * -1;
+
+       prev_csp = sp + frame_size;
+       prev_cra = (void *) *((uintcap_t *) (prev_csp - sizeof(void *)));
+    } else { // Leaf functions not setting up a stack frame (> -O1)
+       // previous stack pointer is the same as the current one didn't setup or
+       // have a stack frame being a leaf function.
+       prev_csp = sp;
+
+       // cra of the leaf function that got an exception
+       prev_cra = ret_reg;
     }
 
-    cra = cheri_build_data_cap((size_t) cra, 0x1000, 0xfffff);
-    uint32_t pc_instr; //= *((uint32_t *) cra);
-    size_t prevCompID = xCompID;
+    // Build a cap for prev_cra (which is likely  a sentry) and read it
+    prev_cra = cheri_build_data_cap((size_t) prev_cra, 16, __CHERI_CAP_PERMISSION_PERMIT_LOAD__);
+    memcpy(&prev_cra_instruction, prev_cra, 4);
 
-    memcpy(&pc_instr, cra, 4);
+    // Check if the previous stack frame is a compartment trampoline, then skip/unwind it
+    if ((prev_cra_instruction == tramp_switch_instructions[0] ||
+         prev_cra_instruction == tramp_switch_instructions[1])) {
 
-    uint32_t instr_switch1[] = {0x03012d8f, 0x0d01240f};
-    // Check for trampolines
-    if ((pc_instr == instr_switch1[0] || pc_instr == instr_switch1[1])) {
-      // Get previous compid
-      func_addr = cra;
-      cra = (void *) *((uintcap_t *) (csp - sizeof(void *)));
-      cra = (size_t) __builtin_cheri_base_get(cra);
-      cra = cheri_build_data_cap((size_t) cra, 0x1000, 0xfffff);
-      if (instr_switch1[0] == pc_instr) {
-        prevCompID = (size_t) *((size_t *) (csp - 0 * sizeof(void *)));
+      // If it was a compartment_switch, get the previous compartment ID
+      if (tramp_switch_instructions[0] == prev_cra_instruction) {
+        prevCompID = (size_t) *((size_t *) (prev_csp - 0 * sizeof(void *)));
+        printf("%s0x%x: %s<compartment_switch>\n", KBLU, (size_t) prev_cra, KCYN);
       }
+
+      // If the previous compartment ID is valid, unwind the trampoline and recursively
+      // walk the stack.
       if (prevCompID < configCOMPARTMENTS_NUM) {
-        printf("%s0x%x: %s<compartment_switch>\n", KBLU, (size_t) cra, KCYN);
-        csp += 15 * sizeof(void*);
-        cra = (void *) *((uintcap_t *) (csp - sizeof(void *)));
-        //cra = cheri_build_data_cap((size_t) cra, 0x1000, 0xfffff);
-        func_addr = rtems_rtl_symbol_find_by_address(cra, csp, cra, prevCompID);
-      }
-      else {
+        // Get the pre-trampoline stack frame
+        prev_csp += 15 * sizeof(void*);
+        // Get the pre-trampoline cra
+        prev_cra = (void *) *((uintcap_t *) (prev_csp - sizeof(void *)));
+
+        // Recursively stack trace the pre-trampoline function/cra
+        func_addr = rtl_cherifreertos_compartment_backtrace(prev_cra, prev_csp, prev_cra, prevCompID);
+      } else { // The previous compartment is invalid or not a compartment
         printf("%s", KNRM);
         return NULL;
       }
-    } else {
-      func_addr = rtems_rtl_symbol_find_by_address(cra, csp, cra, prevCompID);
+    } else { // Not a trampoline, just normal c-function call. Recursively unwind
+      func_addr = rtl_cherifreertos_compartment_backtrace(prev_cra, prev_csp, prev_cra, prevCompID);
     }
-  } else {
+  } else { // Function not found, return and end stack trace
     printf("%s", KNRM);
     return NULL;
   }
 }
+#endif
 
 void
 rtems_rtl_symbol_obj_add (rtems_rtl_obj* obj)
