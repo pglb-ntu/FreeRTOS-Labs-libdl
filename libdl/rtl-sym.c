@@ -35,6 +35,12 @@
 #include <cheri/cheri-utility.h>
 #endif
 
+#define KYEL  "\x1B[33m"
+#define KNRM  "\x1B[0m"
+#define KBLU  "\x1B[34m"
+#define KGRN  "\x1B[32m"
+#define KCYN  "\x1B[36m"
+
 /**
  * The single symbol forced into the global symbol table that is used to load a
  * symbol table from an object file.
@@ -265,6 +271,40 @@ rtems_rtl_symbol_global_find (const char* name)
     if (strcmp (name, sym->name) == 0)
       return sym;
     node = listGET_NEXT (node);
+  }
+
+  return NULL;
+}
+
+void*
+rtems_rtl_symbol_global_find_by_address (size_t target_pc)
+{
+  rtems_rtl_symbols*   symbols;
+  uint_fast32_t        hash;
+  List_t* bucket;
+  ListItem_t*    node;
+  size_t sym_addr = 0;
+
+  symbols = rtems_rtl_global_symbols ();
+  rtems_rtl_obj* obj = rtems_rtl_baseimage();
+
+  for (int i = 0; i < symbols->nbuckets; i++) {
+    bucket = &symbols->buckets[i];
+    node = listGET_HEAD_ENTRY (bucket);
+    while (listGET_END_MARKER (bucket) != node)
+    {
+      rtems_rtl_obj_sym* sym = (rtems_rtl_obj_sym*) node;
+
+      sym_addr = (size_t) sym->value;
+
+      if ( (target_pc >= sym_addr) && (target_pc < (sym_addr + sym->size)))
+      {
+          printf("%s0x%x: %s%s%s<%s+%d>\n", KBLU, (size_t) target_pc, KGRN, obj->oname, KYEL, sym->name, target_pc - sym_addr);
+          return obj->captable[sym->capability];
+      }
+
+      node = listGET_NEXT (node);
+    }
   }
 
   return NULL;
@@ -636,6 +676,101 @@ rtems_rtl_isymbol_obj_mint (rtems_rtl_obj* src_obj, rtems_rtl_obj* dest_obj, con
   vListInsertEnd(&dest_obj->externals_list, &esym->node);
 
   return esym;
+}
+
+void*
+rtems_rtl_symbol_find_by_address(void* pc, void* sp, void* ret_reg, size_t xCompID) {
+
+  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(xCompID);
+  rtems_rtl_obj_sym* sym;
+  size_t             s;
+  size_t target_pc = (size_t) pc;
+  size_t sym_addr = 0;
+  const char *func_name = NULL;
+  void* func_addr = NULL;
+
+  if (obj == NULL) {
+    printf("%s", KNRM);
+    return NULL;
+  }
+
+  printf("%s", KYEL);
+  func_addr = rtems_rtl_symbol_global_find_by_address((size_t) pc);
+
+  for (s = 0, sym = obj->global_table; s < obj->global_syms; ++s, ++sym) {
+    sym_addr = sym->value;
+    if ( target_pc >= sym_addr && target_pc < sym_addr + sym->size) {
+      printf("%s0x%x: %s%s%s<%s+%d>\n", KBLU, (size_t) pc, KGRN, obj->oname, KYEL, sym->name, pc - sym->value);
+      func_addr = sym->value;
+    }
+  }
+
+  for (s = 0, sym = obj->local_table; s < obj->local_syms; ++s, ++sym) {
+    sym_addr = sym->value;
+    if ( target_pc >= sym_addr && target_pc < sym_addr + sym->size) {
+      printf("%s0x%x: %s%s%s<%s+%d>\n", KBLU, (size_t) pc, KGRN, obj->oname, KYEL, sym->name, pc - sym->value);
+      //printf("%s+%d ()\n", sym->name, pc - sym->value);
+      func_addr = sym->value;
+    }
+  }
+
+  if (func_addr) {
+    // Get frame size
+    func_addr = cheri_build_data_cap((size_t) func_addr, 0x1000, 0xfffff);
+    int32_t instruction;
+    memcpy(&instruction, func_addr, 4);
+    size_t frame_size = (instruction >> 20) * -1;
+    uint32_t opcode = instruction & ((0x1 << 12) | 0x7f);
+    uint32_t cincoffimm = (0x1 << 12) | 0x5b;
+
+    pc = cheri_build_data_cap((size_t) pc, 0x1000, 0xfffff);
+
+    void* csp;
+    void* cra;
+
+    if (opcode == cincoffimm) {
+       csp = sp + frame_size;
+       cra = (void *) *((uintcap_t *) (csp - sizeof(void *)));
+    } else { // Leaf functions not setting up a stack frame (> O1)
+       csp = sp;
+       cra = ret_reg;
+    }
+
+    cra = cheri_build_data_cap((size_t) cra, 0x1000, 0xfffff);
+    uint32_t pc_instr; //= *((uint32_t *) cra);
+    size_t prevCompID = xCompID;
+
+    memcpy(&pc_instr, cra, 4);
+
+    uint32_t instr_switch1[] = {0x03012d8f, 0x0d01240f};
+    // Check for trampolines
+    if ((pc_instr == instr_switch1[0] || pc_instr == instr_switch1[1])) {
+      // Get previous compid
+      func_addr = cra;
+      cra = (void *) *((uintcap_t *) (csp - sizeof(void *)));
+      cra = (size_t) __builtin_cheri_base_get(cra);
+      cra = cheri_build_data_cap((size_t) cra, 0x1000, 0xfffff);
+      if (instr_switch1[0] == pc_instr) {
+        prevCompID = (size_t) *((size_t *) (csp - 0 * sizeof(void *)));
+      }
+      if (prevCompID < configCOMPARTMENTS_NUM) {
+        printf("%s0x%x: %s<compartment_switch>\n", KBLU, (size_t) cra, KCYN);
+        csp += 15 * sizeof(void*);
+        cra = (void *) *((uintcap_t *) (csp - sizeof(void *)));
+        //cra = cheri_build_data_cap((size_t) cra, 0x1000, 0xfffff);
+        func_addr = rtems_rtl_symbol_find_by_address(cra, csp, cra, prevCompID);
+      }
+      else {
+        printf("%s", KNRM);
+        return NULL;
+      }
+    } else {
+      func_addr = rtems_rtl_symbol_find_by_address(cra, csp, cra, prevCompID);
+    }
+  } else {
+    printf("%s", KNRM);
+    return NULL;
+  }
 }
 
 void
