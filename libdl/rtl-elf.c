@@ -1966,6 +1966,10 @@ rtems_rtl_elf_file_load (rtems_rtl_obj* obj, void* fd)
 
   //rtems_rtl_symbol_obj_erase_local (obj);
 
+#if configCHERI_COMPARTMENTALIZATION
+  rtl_cherifreertos_compartment_captable_set_perms (rtl_cherifreertos_compartment_get_compid(obj));
+#endif
+
   if (!rtems_rtl_elf_load_linkmap (obj))
   {
     return false;

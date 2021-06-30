@@ -32,6 +32,7 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheric.h>
+#include <cheriintrin.h>
 #include <cheri/cheri-utility.h>
 extern void *pvAlmightyDataCap;
 extern void *pvAlmightyCodeCap;
@@ -261,6 +262,27 @@ uint32_t rtl_cherifreertos_compartment_get_free_compid(void) {
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
+
+bool
+rtl_cherifreertos_compartment_captable_set_perms (size_t xCompID)
+{
+  if (xCompID >= configCOMPARTMENTS_NUM)
+    return false;
+
+  void** captable = comp_list[xCompID].captable;
+
+  if (captable == NULL) {
+    printf("Invalid captab to set permissions on\n");
+    return false;
+  }
+
+  captable = cheri_perms_and(captable,
+                 __CHERI_CAP_PERMISSION_PERMIT_LOAD__ |
+                 __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__);
+
+  comp_list[xCompID].captable = captable;
+}
+
 #if configCHERI_COMPARTMENTALIZATION_MODE == 1
 bool
 rtl_cherifreertos_compartment_set_captable(rtems_rtl_obj* obj) {

@@ -120,6 +120,19 @@ rtl_cherifreertos_compartment_get_captable(size_t comp_id);
  * @retval true If allocated successfully
  * @retval false The table could not be created. The RTL error has the error.
  */
+
+/**
+ * Set permissions on the captable for a given compartment
+ */
+bool
+rtl_cherifreertos_compartment_captable_set_perms (size_t xCompID);
+
+/**
+ * Print all loaded object compartments with extra debugging info
+ */
+void
+rtl_cherifreertos_debug_print_compartments(void);
+
 bool
 rtl_cherifreertos_captable_alloc(rtems_rtl_obj* obj, size_t caps_count);
 
