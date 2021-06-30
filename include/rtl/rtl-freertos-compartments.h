@@ -174,13 +174,13 @@ rtl_cherifreertos_captable_install_new_cap(rtems_rtl_obj* obj, void* new_cap);
 /**
  * Get a new compartment ID value to set a newly loaded compartment with
  */
-uint32_t
+size_t
 rtl_cherifreertos_compartment_get_free_compid(void);
 
 /**
  * Get the compartment ID value for a compartment from an object.
  */
-uint32_t
+size_t
 rtl_cherifreertos_compartment_get_compid(rtems_rtl_obj* obj);
 
 /**
