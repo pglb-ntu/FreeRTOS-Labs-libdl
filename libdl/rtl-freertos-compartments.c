@@ -892,4 +892,22 @@ FreeRTOSCompartmentResources_t* pCompResTable = NULL;
 
   // TODO: Revoke other FreeRTOS resources as well
 }
+
+void rtl_cherifreertos_debug_print_compartments(void) {
+  List_t* objects = rtems_rtl_objects_unprotected();
+  ListItem_t* node = listGET_HEAD_ENTRY (objects);
+
+  while (listGET_END_MARKER (objects) != node)
+  {
+    rtems_rtl_obj* obj = (rtems_rtl_obj* ) node;
+    void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
+    size_t xCompID = rtl_cherifreertos_compartment_get_compid(obj);
+
+    printf("rtl:debug: %s@0x%x\t\n", obj->oname, obj->text_base);
+    printf("compid = #%u ", xCompID);
+    printf("captab = %p\n", obj->captable);
+
+    node = listGET_NEXT (node);
+  }
+}
 #endif
