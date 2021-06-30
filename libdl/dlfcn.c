@@ -57,10 +57,6 @@ dlopen (const char* name, int mode)
 
   _rtld_debug.r_state = RT_ADD;
 
-  #if configLIBDL_GDB_DEBUG
-    _rtld_debug_state ();
-  #endif
-
   if (name)
     obj = rtems_rtl_load (name, mode);
   else
