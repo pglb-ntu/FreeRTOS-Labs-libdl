@@ -151,7 +151,7 @@ rtems_rtl_symbol_global_add (rtems_rtl_obj*       obj,
     return false;
   }
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION
 #if configCHERI_COMPARTMENTALIZATION_MODE == 1
   obj->captable = NULL;
   if (!rtl_cherifreertos_captable_alloc(obj, count))
@@ -207,7 +207,7 @@ rtems_rtl_symbol_global_add (rtems_rtl_obj*       obj,
 
     sym->size = sym_details->size;
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION
       void *cap = NULL;
       if (ELF_ST_TYPE(sym_details->type) == STT_OBJECT) {
         cap = cheri_build_data_cap((ptraddr_t) sym_details->value,
@@ -620,7 +620,7 @@ rtems_rtl_isymbol_obj_mint (rtems_rtl_obj* src_obj, rtems_rtl_obj* dest_obj, con
   memcpy(esym, sym, sizeof(rtems_rtl_obj_sym));
   memcpy(estring, name, slen);
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION
   // Allocate a new cap slot in the interface captable and install it
 #if configCHERI_COMPARTMENTALIZATION_MODE == 1
   esym->capability = rtl_cherifreertos_captable_install_new_cap(dest_obj, *(src_obj->captable + sym->capability));

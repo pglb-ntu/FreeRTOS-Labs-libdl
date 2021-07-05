@@ -1249,7 +1249,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
       if (symsect)
       {
         osym->value += (intptr_t) symsect->base;
-#ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION
         void *cap = NULL;
 	void *tramp_cap = NULL;
 
@@ -1306,7 +1306,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
       if (symsect)
       {
         osym->value += (intptr_t) symsect->base;
-#ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION
         void *cap = NULL;
 	void *tramp_cap = NULL;
 
@@ -1891,7 +1891,7 @@ rtems_rtl_elf_file_load (rtems_rtl_obj* obj, void* fd)
   if (!rtems_rtl_obj_load_symbols (obj, fd, rtems_rtl_elf_symbols_load, &ehdr))
     return false;
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION
 #if configCHERI_COMPARTMENTALIZATION_MODE == 1
   obj->captable = NULL;
   obj->comp_id  = rtl_cherifreertos_compartment_get_free_compid();

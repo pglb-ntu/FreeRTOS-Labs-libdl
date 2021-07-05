@@ -331,7 +331,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
   }
 
   if (parsing) {
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef configCHERI_COMPARTMENTALIZATION
     if (ELF_R_TYPE(rela->r_info) == R_TYPE(CHERI_CAPTAB_PCREL_HI20)) {
       // Do nothing
     }
@@ -588,7 +588,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
   }
   break;
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION
   case R_TYPE(CHERI_CAPABILITY): {
     rtems_rtl_obj_sym *rtl_sym = rtems_rtl_symbol_obj_find(obj, symname);
 

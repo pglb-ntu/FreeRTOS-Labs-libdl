@@ -142,7 +142,7 @@ dlsym (void* handle, const char *symbol)
     return NULL;
   }
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION
     void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
     symval = captable[sym->capability];
 #endif
@@ -181,7 +181,7 @@ dlinfo (void* handle, int request, void** p)
         *((int*) p) = rtems_rtl_obj_unresolved (obj) ? 1 : 0;
         rc = 0;
         break;
-#ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION
       case RTLD_DI_CHERI_CAPTABLE: {
         void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
         *p = cheri_seal_cap(captable, rtl_cherifreertos_compartment_get_compid(obj));

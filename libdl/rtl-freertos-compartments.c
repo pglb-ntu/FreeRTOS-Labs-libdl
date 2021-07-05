@@ -1,5 +1,3 @@
-
-#if configCHERI_COMPARTMENTALIZATION
 #ifdef HAVE_CONFIG_H
 #include <waf_config.h>
 #endif
@@ -86,7 +84,6 @@ void* rtl_freertos_compartment_open(const char *name)
 #endif
 }
 
-#if configCHERI_COMPARTMENTALIZATION
 bool rtl_freertos_compartment_close(rtems_rtl_obj* obj)
 {
   #if configCHERI_COMPARTMENTALIZATION_MODE == 1
@@ -100,7 +97,6 @@ bool rtl_freertos_compartment_close(rtems_rtl_obj* obj)
   #endif /* configCHERI_COMPARTMENTALIZATION_MODE */
 return true;
 }
-#endif
 
 size_t rtl_freertos_compartment_read(void* fd, void *buffer, UBaseType_t offset, size_t count)
 {
@@ -134,6 +130,7 @@ size_t rtl_freertos_compartment_getsize(void *fd) {
 #endif
 }
 
+#if configCHERI_COMPARTMENTALIZATION
 void
 rtems_rtl_symbol_global_insert (rtems_rtl_symbols* symbols,
                                 rtems_rtl_obj_sym* symbol);
