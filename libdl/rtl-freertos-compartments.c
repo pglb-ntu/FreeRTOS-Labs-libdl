@@ -29,6 +29,7 @@
 
 #include <sys/exec_elf.h>
 
+#if configCHERI_COMPARTMENTALIZATION
 #include <cheric.h>
 #include <cheriintrin.h>
 #include <cheri/cheri-utility.h>
@@ -44,10 +45,10 @@ extern char*  __strtab_end;
 
 Compartment_t comp_list[configCOMPARTMENTS_NUM];
 static size_t comp_id_free = 0;
+#endif /* configCHERI_COMPARTMENTALIZATION */
 
 void* rtl_freertos_compartment_open(const char *name)
 {
-#ifdef ipconfigUSE_FAT_LIBDL
   FF_FILE *file = ff_fopen( name, "r" );
 
   if (file == NULL) {
@@ -56,32 +57,6 @@ void* rtl_freertos_compartment_open(const char *name)
   }
 
   return file;
-
-#else
-  const char* comp_name = NULL;
-  char name_buff[configMAXLEN_COMPNAME];
-
-  char *name_dot = strrchr(name, '.');
-  if (name_dot == NULL) {
-    return -1;
-  }
-
-  comp_name = rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, name_dot - name + 1, true);
-  if (!comp_name) {
-    rtems_rtl_set_error (ENOMEM, "no memory for comp file name");
-    return -1;
-  }
-
-  memcpy(comp_name, name, name_dot - name);
-
-  for(int i = 0; i < configCOMPARTMENTS_NUM; i++) {
-    if (strncmp(comp_list[i].name, comp_name, configMAXLEN_COMPNAME) == 0) {
-      return i;
-    }
-  }
-
-  return -1;
-#endif
 }
 
 bool rtl_freertos_compartment_close(rtems_rtl_obj* obj)
@@ -100,34 +75,11 @@ return true;
 
 size_t rtl_freertos_compartment_read(void* fd, void *buffer, UBaseType_t offset, size_t count)
 {
-#ifdef ipconfigUSE_FAT_LIBDL
   return ff_fread( buffer, 1, count, (FF_FILE *) fd );
-#else
-  if (fd < 0 || fd >= configCOMPARTMENTS_NUM) {
-    rtems_rtl_set_error (EBADF, "Invalid compartment/fd number");
-    return -1;
-  }
-
-  // If trying to read past the file size, trim down the count to read only to
-  // the EoF.
-  if (offset + count > comp_list[fd].size) {
-    count -= (offset + count) - comp_list[fd].size;
-  }
-
-  if (memcpy(buffer, comp_list[fd].cap + offset, count)) {
-    return count;
-  }
-
-  return -1;
-#endif
 }
 
 size_t rtl_freertos_compartment_getsize(void *fd) {
-#ifdef ipconfigUSE_FAT_LIBDL
   return ((FF_FILE *) fd)->ulFileSize;
-#else
-  return comp_list[fd].size;
-#endif
 }
 
 #if configCHERI_COMPARTMENTALIZATION
