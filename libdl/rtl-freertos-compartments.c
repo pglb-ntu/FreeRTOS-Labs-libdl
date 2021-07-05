@@ -30,7 +30,7 @@
 
 #include <sys/exec_elf.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if configCHERI_COMPARTMENTALIZATION
 #include <cheric.h>
 #include <cheriintrin.h>
 #include <cheri/cheri-utility.h>
