@@ -1,4 +1,5 @@
 
+#if configCHERI_COMPARTMENTALIZATION
 #ifdef HAVE_CONFIG_H
 #include <waf_config.h>
 #endif
@@ -30,13 +31,11 @@
 
 #include <sys/exec_elf.h>
 
-#if configCHERI_COMPARTMENTALIZATION
 #include <cheric.h>
 #include <cheriintrin.h>
 #include <cheri/cheri-utility.h>
 extern void *pvAlmightyDataCap;
 extern void *pvAlmightyCodeCap;
-#endif
 
 #if 0
 extern Elf_Sym*  __symtab_start;
@@ -260,8 +259,6 @@ size_t rtl_cherifreertos_compartment_get_free_compid(void) {
 
   return comp_id_free++;
 }
-
-#ifdef __CHERI_PURE_CAPABILITY__
 
 bool
 rtl_cherifreertos_compartment_captable_set_perms (size_t xCompID)
