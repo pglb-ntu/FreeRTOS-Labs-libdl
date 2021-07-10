@@ -873,7 +873,7 @@ void rtl_cherifreertos_debug_print_compartments(void) {
 
     printf("rtl:debug: %s@0x%x\t\n", obj->oname, obj->text_base);
     printf("compid = #%u ", xCompID);
-    printf("captab = %p\n", obj->captable);
+    printf("captab = %p\n", captable);
 
     node = listGET_NEXT (node);
   }
