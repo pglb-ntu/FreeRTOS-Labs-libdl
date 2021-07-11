@@ -737,9 +737,14 @@ rtl_cherifreertos_compartment_backtrace(void* pc, void* sp, void* ret_reg, size_
     void* prev_cra;
     uint32_t prev_cra_instruction;
     size_t prevCompID = xCompID;
-    // FIXME for CHERI-RV32
-    uint32_t tramp_switch_instructions[] = {0x03012d8f,  // inter-compartment return instruction (load_x cs0, 13 * portWORD_SIZE(csp))
-                                            0x0d01240f}; // intra-compartment return instruction (load_x cs11, 3 * portWORD_SIZE(csp))
+
+    #if __riscv_xlen == 64
+        uint32_t tramp_switch_instructions[] = {0x03012d8f,  // inter-compartment return instruction (load_x cs0, 13 * portWORD_SIZE(csp))
+                                                0x0d01240f}; // intra-compartment return instruction (load_x cs11, 3 * portWORD_SIZE(csp))
+    #else
+        uint32_t tramp_switch_instructions[] = {0x01813d83,  // inter-compartment return instruction (load_x cs0, 13 * portWORD_SIZE(csp))
+                                                0x06813403}; // intra-compartment return instruction (load_x cs11, 3 * portWORD_SIZE(csp))
+    #endif
 
     // For non-leaf function, the very first instruction is a cincoffset of csp
     // to setup the stack frame
