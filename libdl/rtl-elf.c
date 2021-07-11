@@ -1266,6 +1266,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
           cap = cheri_build_code_cap((ptraddr_t) osym->value,
           osym->size,
           __CHERI_CAP_PERMISSION_GLOBAL__ | \
+          __CHERI_CAP_PERMISSION_ACCESS_SYSTEM_REGISTERS__  | \
           __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__ | \
           __CHERI_CAP_PERMISSION_PERMIT_LOAD__ | \
           __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
