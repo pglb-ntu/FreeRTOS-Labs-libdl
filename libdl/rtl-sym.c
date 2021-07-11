@@ -511,8 +511,10 @@ rtems_rtl_symbol_obj_extract (rtems_rtl_obj* obj, const char* name)
   rtems_rtl_obj_sym* match = NULL;
   match = rtems_rtl_lsymbol_obj_find(obj, name);
 
-  if (match)
-    uxListRemove((ListItem_t *) match);
+  if (match && listGET_LIST_ITEM_OWNER( &match->node))
+  {
+    uxListRemove((ListItem_t *) &match->node);
+  }
 
   return match;
 #endif
