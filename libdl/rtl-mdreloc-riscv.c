@@ -626,7 +626,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
 
       return rtems_rtl_elf_rel_no_error;
     } else {
-      rtems_rtl_set_error (EINVAL, "Couldn't find the %s symbol for FREERTOS_GPREL reloc\n");
+      rtems_rtl_set_error (EINVAL, "Couldn't find the %s symbol for FREERTOS_GPREL reloc\n", symname);
       return rtems_rtl_elf_rel_failure;
     }
   }
