@@ -331,11 +331,6 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
   }
 
   if (parsing) {
-#if configCHERI_COMPARTMENTALIZATION
-    if (ELF_R_TYPE(rela->r_info) == R_TYPE(CHERI_CAPTAB_PCREL_HI20)) {
-      // Do nothing
-    }
-#endif
     return rtems_rtl_elf_rel_no_error;
   }
 
