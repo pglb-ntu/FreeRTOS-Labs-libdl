@@ -642,6 +642,7 @@ rtems_rtl_isymbol_obj_mint (rtems_rtl_obj* src_obj, rtems_rtl_obj* dest_obj, con
   // Add the symbol to the dest_obj extenals list
   vListInitialiseItem(&esym->node);
   vListInsertEnd(&dest_obj->externals_list, &esym->node);
+  dest_obj->externals_syms++;
 
   return esym;
 }
