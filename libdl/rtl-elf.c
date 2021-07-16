@@ -1260,6 +1260,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
           __CHERI_CAP_PERMISSION_PERMIT_LOAD__ | \
           __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
+          __CHERI_CAP_PERMISSION_PERMIT_STORE_LOCAL__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
           osym->capability = rtl_cherifreertos_captable_install_new_cap(obj, cap);
         } else if (ELF_ST_TYPE(osym->data >> 16) == STT_FUNC) {
@@ -1318,7 +1319,8 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
           __CHERI_CAP_PERMISSION_PERMIT_LOAD__ | \
           __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
-           __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
+          __CHERI_CAP_PERMISSION_PERMIT_STORE_LOCAL__ | \
+          __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
           osym->capability = rtl_cherifreertos_captable_install_new_cap(obj, cap);
         } else if (ELF_ST_TYPE(osym->data >> 16) == STT_FUNC) {
           cap = cheri_build_code_cap((ptraddr_t) osym->value,
