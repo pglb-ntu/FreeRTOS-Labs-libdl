@@ -667,7 +667,9 @@ rtl_cherifreertos_compartment_faultHandler(BaseType_t compid) {
   }
 
   if (obj->faultHandler == NULL) {
-    printf("No attached fault handler for compartment %s, returning to caller directely\n", obj->oname);
+    #if DEBUG
+      printf("No attached fault handler for compartment %s, returning to caller directly\n", obj->oname);
+    #endif
     return false;
   }
 
@@ -681,7 +683,9 @@ rtl_cherifreertos_compartment_faultHandler(BaseType_t compid) {
   }
 
   if (archive->faultHandler == NULL) {
-    printf("No fault handler for compartment %s, returning to caller directely\n", archive->name);
+    #if DEBUG
+      printf("No fault handler for compartment %s, returning to caller directly\n", archive->name);
+    #endif
     return false;
   }
 
