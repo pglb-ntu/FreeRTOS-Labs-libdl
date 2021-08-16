@@ -671,7 +671,8 @@ rtems_rtl_symbol_global_find_by_address (size_t target_pc)
       if ( (target_pc >= sym_addr) && (target_pc < (sym_addr + sym->size)))
       {
           printf("%s0x%x: %s%s%s<%s+%d>\n", KBLU, (size_t) target_pc, KGRN, obj->oname, KYEL, sym->name, target_pc - sym_addr);
-          return obj->captable[sym->capability];
+          void** captab = rtl_cherifreertos_compartment_obj_get_captable(obj);
+          return (void *) captab[sym->capability];
       }
 
       node = listGET_NEXT (node);
