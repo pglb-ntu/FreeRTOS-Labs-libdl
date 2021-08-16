@@ -1170,6 +1170,15 @@ rtems_rtl_archive_single_obj_load (rtems_rtl_archive* archive, size_t obj_offset
 
   obj->archive = archive;
 
+  #if configCHERI_COMPARTMENTALIZATION_MODE == 2
+      rtems_rtl_obj_sym* sym = rtems_rtl_gsymbol_obj_find (obj, "CheriFreeRTOS_FaultHandler");
+
+      if (sym) {
+        printf("Registering obj->archive->comp_id = %d\n", archive->comp_id);
+        rtl_cherifreertos_compartment_register_faultHandler(archive->comp_id, archive->captable[sym->capability]);
+      }
+  #endif
+
   rtems_rtl_obj_caches_flush ();
 
   if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
