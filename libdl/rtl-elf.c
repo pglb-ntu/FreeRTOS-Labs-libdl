@@ -1273,11 +1273,11 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
           __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
-          // tramp_cap = rtl_cherifreertos_compartments_setup_ecall(cap, rtl_cherifreertos_compartment_get_compid(obj));
-          // if (tramp_cap == NULL)
-          //  return false;
+          tramp_cap = rtl_cherifreertos_compartments_setup_ecall(cap, rtl_cherifreertos_compartment_get_compid(obj));
+          if (tramp_cap == NULL)
+            return false;
 
-          osym->capability = rtl_cherifreertos_captable_install_new_cap(obj, cap);
+          osym->capability = rtl_cherifreertos_captable_install_new_cap(obj, tramp_cap);
         }
 
         if (!osym->capability) {
