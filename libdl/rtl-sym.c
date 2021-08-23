@@ -685,13 +685,17 @@ rtems_rtl_symbol_global_find_by_address (size_t target_pc)
 void*
 rtl_cherifreertos_compartment_backtrace(void* pc, void* sp, void* ret_reg, size_t xCompID) {
 
-  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(xCompID);
   rtems_rtl_obj_sym* sym;
   size_t             s;
   size_t target_pc = (size_t) pc;
   size_t sym_addr = 0;
   void* func_addr = NULL;
 
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(xCompID);
+#else
+  rtems_rtl_obj* obj = rtems_rtl_baseimage();
+#endif
   if (obj == NULL) {
     printf("%s", KNRM);
     return NULL;
