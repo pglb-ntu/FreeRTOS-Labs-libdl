@@ -19,6 +19,7 @@
 #include <dlfcn.h>
 #include <rtl/rtl.h>
 #include <rtl/rtl-freertos-compartments.h>
+#include <sys/exec_elf.h>
 
 #include <FreeRTOSConfig.h>
 
@@ -143,8 +144,17 @@ dlsym (void* handle, const char *symbol)
   }
 
 #if configCHERI_COMPARTMENTALIZATION
+    void* tramp_cap;
     void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
     symval = captable[sym->capability];
+    /* Setup a compartment switch trampoline if it is a function */
+    if (ELF_ST_TYPE(sym->data >> 16) == STT_FUNC) {
+      tramp_cap = rtl_cherifreertos_compartments_setup_ecall(symval, rtl_cherifreertos_compartment_get_compid(obj));
+      if (tramp_cap == NULL)
+        return NULL;
+      else
+        symval = tramp_cap;
+    }
 #endif
 
   rtems_rtl_unlock ();
