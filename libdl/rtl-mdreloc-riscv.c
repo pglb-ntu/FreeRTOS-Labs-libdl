@@ -606,11 +606,102 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
 
   case R_TYPE(CHERI_CAPTAB_FREERTOS_GPREL): {
     rtems_rtl_obj_sym *rtl_sym;
+    void* tramp_cap;
+    size_t cap_offset = 0;
 
     rtl_sym = rtems_rtl_symbol_obj_find(obj, symname);
     if (rtl_sym) {
 
-      size_t gp_rel_val = (size_t) ((Elf_Word) rtl_sym->capability) * sizeof(void *);
+      if (ELF_ST_TYPE(rtl_sym->data >> 16) == STT_FUNC) {
+        // Find the owner compartment of this symbol
+        rtems_rtl_obj* owner_obj = rtems_rtl_find_obj_with_symbol(symname);
+        if (owner_obj == NULL) {
+          // It is a local static function
+          owner_obj = obj;
+        }
+
+        // Get the symbol/capability from the owner's obj/captable
+        rtl_sym = rtems_rtl_symbol_obj_find(owner_obj, symname);
+        if (rtl_sym == NULL) {
+          return rtems_rtl_elf_rel_failure;
+        }
+
+        // Get the source function capability
+        void** captable = rtl_cherifreertos_compartment_obj_get_captable(owner_obj);
+        void* func_cap = captable[rtl_sym->capability];
+        tramp_cap = rtl_cherifreertos_compartments_setup_ecall(func_cap, rtl_cherifreertos_compartment_get_compid(owner_obj));
+        if (tramp_cap == NULL) {
+          return rtems_rtl_elf_rel_failure;
+        } else {
+          // Install the new trampoline into the caller's captable
+          cap_offset = rtl_cherifreertos_captable_install_new_cap(obj, tramp_cap);
+        }
+      } else {
+        cap_offset = rtl_sym->capability;
+      }
+
+      size_t gp_rel_val = (size_t) ((Elf_Word) cap_offset) * sizeof(void *);
+
+      int64_t hi = (gp_rel_val + 0x800) >> 12;
+      int64_t lo = (gp_rel_val - (hi << 12)) & 0xFFF;
+
+      short tmpreg = (read16le(where) & 0xf80) >> 7;
+      uint32_t cincoff = read32le(where + 1);
+
+      // lui gpr, #hi20(cap_addr)
+      write32le(where, (hi << 12) | read32le(where));
+      // cincoffset ctmpreg, cgp, gpr
+      // lc ctmpreg, #lo12(cap_addr)(ctmpreg)
+      write32le((where + 2), (lo << 20) | read32le(where + 2));
+
+      return rtems_rtl_elf_rel_no_error;
+    } else {
+      rtems_rtl_set_error (EINVAL, "Couldn't find the %s symbol for FREERTOS_GPREL reloc\n", symname);
+      return rtems_rtl_elf_rel_failure;
+    }
+  }
+  break;
+
+  case R_TYPE(CHERI_CCALL_FREERTOS_GPREL): {
+    rtems_rtl_obj_sym *rtl_sym;
+    void* tramp_cap;
+    size_t cap_offset = 0;
+
+    rtl_sym = rtems_rtl_symbol_obj_find(obj, symname);
+    if (rtl_sym) {
+
+      // Check if it is an inter-compartment call and emit a trampoline to performs a comp-switch
+      if (rtl_cherifreertos_is_inter_compartment(obj, symname) && rtems_rtl_esymbol_obj_find(obj, symname)) {
+
+        // Find the owner compartment of this symbol
+        rtems_rtl_obj* owner_obj = rtems_rtl_find_obj_with_symbol(symname);
+        if (owner_obj == NULL) {
+          return rtems_rtl_elf_rel_failure;
+        }
+
+        // Get the symbol/capability from the owner's obj/captable
+        rtl_sym = rtems_rtl_symbol_obj_find(owner_obj, symname);
+        if (rtl_sym == NULL) {
+          return rtems_rtl_elf_rel_failure;
+        }
+
+        // Get the source function capability
+        void** captable = rtl_cherifreertos_compartment_obj_get_captable(owner_obj);
+        void* func_cap = captable[rtl_sym->capability];
+
+        // Emit a trampoline to perform a compartment switch
+        tramp_cap = rtl_cherifreertos_compartments_setup_ecall(func_cap, rtl_cherifreertos_compartment_get_compid(owner_obj));
+        if (tramp_cap == NULL) {
+          return rtems_rtl_elf_rel_failure;
+        } else {
+          // Install the new trampoline into the caller's captable
+          cap_offset = rtl_cherifreertos_captable_install_new_cap(obj, tramp_cap);
+        }
+      } else {
+        cap_offset = rtl_sym->capability;
+      }
+
+      size_t gp_rel_val = (size_t) ((Elf_Word) cap_offset) * sizeof(void *);
 
       int64_t hi = (gp_rel_val + 0x800) >> 12;
       int64_t lo = (gp_rel_val - (hi << 12)) & 0xFFF;

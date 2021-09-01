@@ -130,6 +130,7 @@
 #define R_RISCV_CHERI_CJAL                     199
 #define R_RISCV_CHERI_CCALL                    200
 #define R_RISCV_CHERI_RVC_CJUMP                201
+#define R_RISCV_CHERI_CCALL_FREERTOS_GPREL     254
 #define R_RISCV_CHERI_CAPTAB_FREERTOS_GPREL    255
 #endif
 

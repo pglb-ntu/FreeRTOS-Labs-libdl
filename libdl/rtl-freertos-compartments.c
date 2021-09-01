@@ -602,34 +602,44 @@ rtl_cherifreertos_is_inter_compartment(rtems_rtl_obj* obj, const char* symname) 
 
 void* rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t compid)
 {
-
   rtems_rtl_obj* kernel_obj = rtems_rtl_baseimage();
   rtems_rtl_obj_sym* tramp_sym;
+  rtems_rtl_obj_sym* comp_switch_sym;
   void* tramp_cap_template;
   volatile uintcap_t* tramp_cap_instance;
-  void **captable = rtl_cherifreertos_compartment_get_captable(compid);
+  volatile uintcap_t* global_comp_switch;
+  void **captable = rtl_cherifreertos_compartment_obj_get_captable(kernel_obj);
 
-  /* Find the xPortCompartmentEnterTrampoline template to copy from */
-  tramp_sym = rtems_rtl_symbol_global_find ("xPortCompartmentEnterTrampoline");
+  /* Find the xPortCompartmentTrampSetup template to copy from. This contains metadata such as
+   * function, captable, trampoline func, etc required for further compartment switch */
+  tramp_sym = rtems_rtl_symbol_global_find ("xPortCompartmentTrampSetup");
   if (tramp_sym == NULL) {
-    printf("Failed to fine xPortCompartmentEnterTrampoline needed for inter-compartment calls\n");
+    printf("Failed to find xPortCompartmentTrampSetup needed for inter-compartment calls\n");
     return NULL;
   }
 
-#if configCHERI_COMPARTMENTALIZATION_MODE == 1
-  tramp_cap_template = kernel_obj->captable[tramp_sym->capability];
-#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
-  tramp_cap_template = kernel_obj->archive->captable[tramp_sym->capability];
-#endif /* configCHERI_COMPARTMENTALIZATION_MODE */
+  /* Install the default compartment switch. TODO This might be cusom for compartment-matrices with
+   * refined compartment policies that differ between different inter-compartment calls
+   */
+  comp_switch_sym = rtems_rtl_symbol_global_find ("xPortCompartmentEnterTrampoline");
+  if (comp_switch_sym == NULL) {
+    printf("Failed to find xPortCompartmentEnterTrampoline needed for inter-compartment calls\n");
+    return NULL;
+  }
 
-  /* Allocate memory for the new trampoline */
+  // Get a capability to the setup trampoline function and metadata
+  tramp_cap_template = captable[tramp_sym->capability];
+  // Get a capability to the global default compartment switch function
+  global_comp_switch = captable[comp_switch_sym->capability];
+
+  /* Allocate memory for the new setup trampoline */
   tramp_cap_instance = rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, tramp_sym->size, true);
   if (tramp_cap_instance == NULL) {
     printf("Failed to allocate a new trampoline to do external calls\n");
     return NULL;
   }
 
-  /* Copy template code into the newly allocated area of memory */
+  /* Copy template trampoline into the newly allocated area of memory */
   memcpy(tramp_cap_instance, tramp_cap_template, tramp_sym->size);
 
   /* Setup code cap in the trampoline */
@@ -638,11 +648,17 @@ void* rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t comp
   /* Setup captable in the trampoline */
   tramp_cap_instance[1] = &comp_list[compid].captable;
 
+  /* Setup default compartment switch function */
+  tramp_cap_instance[2] = global_comp_switch;
+
   /* Setup the new compartment ID in the trampoline */
   if (compid >= configCOMPARTMENTS_NUM) {
     return NULL;
   }
-  tramp_cap_instance[2] = compid;
+
+  /* Setup compartment ID by fixing up ADDI immediate */
+  uint32_t* addi_inst = (uint32_t*) &tramp_cap_instance[3];
+  *addi_inst = ((*addi_inst) & 0x000fffff) | (compid << 20);
 
   /* Make the trampoline cap RX only */
   tramp_cap_instance = cheri_build_code_cap((ptraddr_t) tramp_cap_instance,
@@ -653,7 +669,7 @@ void* rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t comp
       __CHERI_CAP_PERMISSION_PERMIT_LOAD__ | \
       __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__);
 
-  /* Create cap and install it */
+  /* return a trampoline cap with an address of the first instruction */
   return &tramp_cap_instance[3];
 }
 
