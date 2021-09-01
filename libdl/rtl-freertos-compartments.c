@@ -14,6 +14,7 @@
 #include <rtl/rtl-freertos-compartments.h>
 #include <rtl/rtl-allocator.h>
 #include <rtl/rtl-obj.h>
+#include <rtl/rtl-archive.h>
 #include <rtl/rtl-trace.h>
 #include <errno.h>
 #include "rtl-error.h"
@@ -571,6 +572,32 @@ rtl_cherifreertos_captable_install_new_cap(rtems_rtl_obj* obj, void* new_cap) {
 #endif
 
   return free_slot;
+}
+
+bool
+rtl_cherifreertos_is_inter_compartment(rtems_rtl_obj* obj, const char* symname) {
+  bool isInterCompartment = true;
+  // If it is in the same object or in the kernel's globals it is intra-compartment
+  if (rtems_rtl_gsymbol_obj_find(obj, symname) ||
+      rtems_rtl_lsymbol_obj_find(obj, symname) ||
+      rtems_rtl_symbol_global_find(symname))
+    isInterCompartment = false;
+#if configCHERI_COMPARTMENTALIZATION_MODE == 2
+  /* Search for a per-archive fault handler */
+  rtems_rtl_archive_obj_data search = {
+    .symbol  = symname,
+    .archive = obj->archive,
+    .offset  = 0
+  };
+
+  rtems_rtl_archive_obj_finder(obj->archive, &search);
+
+  // Found an object in the library compartment that has the symbol
+  if (search.offset)
+    isInterCompartment = false;
+#endif
+
+  return isInterCompartment;
 }
 
 void* rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t compid)

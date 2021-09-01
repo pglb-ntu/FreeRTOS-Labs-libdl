@@ -243,5 +243,12 @@ rtl_cherifreertos_compartment_revoke_resources(BaseType_t compid);
  */
 void*
 rtl_cherifreertos_compartment_backtrace(void* pc, void* sp, void* ra, size_t xCompID);
+
+/**
+ * Check if the symbol exists in the same object or library compartment. If it does not,
+ * this is an inter-compartment call that should trigger a compartment switch.
+ */
+bool
+rtl_cherifreertos_is_inter_compartment(rtems_rtl_obj* obj, const char* symaname);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
