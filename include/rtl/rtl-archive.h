@@ -117,6 +117,40 @@ typedef struct rtems_rtl_archives
   List_t              archives;       /**< The located archives. */
 } rtems_rtl_archives;
 
+/*
+ * Find an object file in archive that contains the symbol we are
+ * searching for.
+ *
+ * The symbol search is performance sensitive. The archive's symbol table being
+ * searched is the symbol table in the archive created by ranlib. This table is
+ * not sorted so a sorted table of pointeres to the symbols is generated after
+ * loading if there are enough symbols. For small symbol tables the search is
+ * linear. The entire table is held in memory. At the time of writing this code
+ * the symbol table for the SPARC architecture's libc is 16k.
+ *
+ * The ranlib table is:
+ *
+ *    [4]                - size of table in bytes
+ *    [0..(entries x 4)] - 4 byte binary offsets into the archive
+ *                         for each symbol
+ *    [0..m]             - variable length table of strings, nul
+ *                         separated and sorted
+ *
+ * Note: The loading of an object file from an archive uses an offset in the
+ *       file name to speed the loading.
+ */
+typedef struct rtems_rtl_archive_obj_data
+{
+  const char*        symbol;   /**< The symbol to search for. */
+  rtems_rtl_archive* archive;  /**< The archive the symbol is found
+                                *   in. */
+  UBaseType_t        offset;   /**< The offset in the archive if found
+                                *   else 0 */
+} rtems_rtl_archive_obj_data;
+
+bool
+rtems_rtl_archive_obj_finder (rtems_rtl_archive* archive, void* data);
+
 /**
  * Error handler call when finding an archive.
  */
