@@ -150,7 +150,7 @@ size_t rtems_rtl_elf_relocate_tramp_max_size (void);
 
 bool
 rtems_rtl_elf_relocs_lo12_locator (rtems_rtl_obj*     obj,
-                                   void*               fd,
+                                   int                 fd,
                                    rtems_rtl_obj_sect* sect,
                                    void*               data);
 /**
@@ -241,7 +241,7 @@ rtems_rtl_elf_rel_status rtems_rtl_elf_relocate_rela (rtems_rtl_obj*            
  * @param obj The object being checked.
  * @param fd The file descriptor.
  */
-bool rtems_rtl_elf_file_check (rtems_rtl_obj* obj, void* fd);
+bool rtems_rtl_elf_file_check (rtems_rtl_obj* obj, int fd);
 
 /**
  * The ELF format load handler.
@@ -249,7 +249,7 @@ bool rtems_rtl_elf_file_check (rtems_rtl_obj* obj, void* fd);
  * @param obj The object to load.
  * @param fd The file descriptor.
  */
-bool rtems_rtl_elf_file_load (rtems_rtl_obj* obj, void* fd);
+bool rtems_rtl_elf_file_load (rtems_rtl_obj* obj, int fd);
 
 /**
  * The ELF format unload handler.

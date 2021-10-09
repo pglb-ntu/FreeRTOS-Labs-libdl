@@ -17,16 +17,12 @@
 #include "waf_config.h"
 #endif
 
-#ifdef ipconfigUSE_FAT_LIBDL
-#include "ff_headers.h"
-#include "ff_stdio.h"
-#endif
-
 #include <errno.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <rtl/rtl.h>
 #include "rtl-chain-iterator.h"
@@ -375,7 +371,7 @@ rtems_rtl_obj_section_alignment (const rtems_rtl_obj* obj, uint32_t mask)
 static bool
 rtems_rtl_obj_section_handler (uint32_t                   mask,
                                rtems_rtl_obj*             obj,
-                               void*                      fd,
+                               int                        fd,
                                rtems_rtl_obj_sect_handler handler,
                                void*                      data)
 {
@@ -857,7 +853,7 @@ rtems_rtl_obj_bss_alignment (const rtems_rtl_obj* obj)
 
 bool
 rtems_rtl_obj_relocate (rtems_rtl_obj*             obj,
-                        void*                      fd,
+                        int                        fd,
                         rtems_rtl_obj_sect_handler handler,
                         void*                      data)
 {
@@ -919,7 +915,7 @@ rtems_rtl_obj_post_resolve_reloc (rtems_rtl_obj* obj)
   const char* name = rtems_rtl_obj_aname_valid(obj)? obj->aname : obj->oname;
 
   if (!rtems_rtl_obj_relocate (obj,
-                                rtl_freertos_compartment_open(name),
+                                open(name, O_RDONLY),
                                 rtems_rtl_elf_relocs_lo12_locator, NULL))
        return false;
 
@@ -963,7 +959,7 @@ rtems_rtl_obj_synchronize_cache (rtems_rtl_obj* obj)
 
 bool
 rtems_rtl_obj_load_symbols (rtems_rtl_obj*             obj,
-                            void*                      fd,
+                            int                        fd,
                             rtems_rtl_obj_sect_handler handler,
                             void*                      data)
 {
@@ -1106,7 +1102,7 @@ rtems_rtl_obj_sections_locate (uint32_t            mask,
 
 bool
 rtems_rtl_obj_alloc_sections (rtems_rtl_obj*             obj,
-                              void*                      fd,
+                              int                        fd,
                               rtems_rtl_obj_sect_handler handler,
                               void*                      data)
 {
@@ -1214,7 +1210,7 @@ static bool
 rtems_rtl_obj_sections_loader (uint32_t                   mask,
                                rtems_rtl_alloc_tag        tag,
                                rtems_rtl_obj*             obj,
-                               void*                      fd,
+                               int                        fd,
                                uint8_t*                   base,
                                rtems_rtl_obj_sect_handler handler,
                                void*                      data)
@@ -1280,7 +1276,7 @@ rtems_rtl_obj_sections_loader (uint32_t                   mask,
 
 bool
 rtems_rtl_obj_load_sections (rtems_rtl_obj*             obj,
-                             void*                      fd,
+                             int                        fd,
                              rtems_rtl_obj_sect_handler handler,
                              void*                      data)
 {
@@ -1373,7 +1369,7 @@ rtems_rtl_obj_run_dtors (rtems_rtl_obj* obj)
 }
 
 static bool
-rtems_rtl_obj_file_load (rtems_rtl_obj* obj, void* fd)
+rtems_rtl_obj_file_load (rtems_rtl_obj* obj, int fd)
 {
   int l;
 
@@ -1426,7 +1422,7 @@ rtems_rtl_obj_orphaned (rtems_rtl_obj* obj)
 bool
 rtems_rtl_obj_load (rtems_rtl_obj* obj)
 {
-  void* fd;
+  int fd;
 
   if (!rtems_rtl_obj_fname_valid (obj))
   {
@@ -1434,8 +1430,7 @@ rtems_rtl_obj_load (rtems_rtl_obj* obj)
     return false;
   }
 
-#if __freertos__
-  fd = rtl_freertos_compartment_open(obj->fname);
+  fd = open (rtems_rtl_obj_fname (obj), O_RDONLY);
   if (fd < 0)
   {
     rtems_rtl_set_error (errno, "opening for object file");
@@ -1457,7 +1452,7 @@ rtems_rtl_obj_load (rtems_rtl_obj* obj)
                                          &enames,
                                          rtems_rtl_obj_set_error))
     {
-      ff_fclose (fd);
+      close (fd);
       return false;
     }
 
@@ -1474,51 +1469,11 @@ rtems_rtl_obj_load (rtems_rtl_obj* obj)
   if (!rtems_rtl_obj_file_load (obj, fd))
   {
     rtems_rtl_set_error (errno, "couldn't find object compartment");
-    ff_fclose (fd);
-    return false;
-  }
-
-  ff_fclose (fd);
-
-#else
-  fd = open (rtems_rtl_obj_fname (obj), O_RDONLY);
-  if (fd < 0)
-  {
-    rtems_rtl_set_error (errno, "opening for object file");
-    return false;
-  }
-
-  /*
-   * Find the object file in the archive if it is an archive that
-   * has been opened.
-   */
-  if (rtems_rtl_obj_aname_valid (obj))
-  {
-    UBaseType_t enames = 0;
-    /* if (!rtems_rtl_obj_archive_find_obj (fd,
-                                         obj->fsize,
-                                         &obj->oname,
-                                         &obj->ooffset,
-                                         &obj->fsize,
-                                         &enames,
-                                         rtems_rtl_obj_set_error))
-    {
-      close (fd);
-      return false;
-    }*/
-  }
-
-  /*
-   * Call the format specific loader.
-   */
-  if (!rtems_rtl_obj_file_load (obj, fd))
-  {
     close (fd);
     return false;
   }
 
   close (fd);
-#endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #if configCHERI_COMPARTMENTALIZATION_MODE == 1
@@ -1544,11 +1499,9 @@ rtems_rtl_obj_load (rtems_rtl_obj* obj)
     */
   if (!_rtld_linkmap_add (obj))
   {
-    ff_fclose (fd);
+    close (fd);
     return false;
   }
-
-  // ff_fclose (fd);
 
   return true;
 }

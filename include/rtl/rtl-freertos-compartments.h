@@ -42,10 +42,10 @@ typedef struct resouceTable {
 extern Compartment_t comp_list[configCOMPARTMENTS_NUM];
 extern char comp_strtab[configCOMPARTMENTS_NUM][configMAXLEN_COMPNAME];
 
-void *rtl_freertos_compartment_open(const char *name);
+int rtl_freertos_compartment_open(const char *name);
 bool rtl_freertos_compartment_close(rtems_rtl_obj* obj);
-size_t rtl_freertos_compartment_read(void* fd, void *buffer, UBaseType_t offset, size_t count);
-size_t rtl_freertos_compartment_getsize(void* fd);
+size_t rtl_freertos_compartment_read(int fd, void *buffer, UBaseType_t offset, size_t count);
+size_t rtl_freertos_compartment_getsize(int fd);
 size_t rtl_freertos_global_symbols_add(rtems_rtl_obj* obj);
 
 /**

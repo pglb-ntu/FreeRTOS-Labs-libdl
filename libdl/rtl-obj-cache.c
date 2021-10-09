@@ -18,11 +18,6 @@
 #include "waf_config.h"
 #endif
 
-#ifdef ipconfigUSE_FAT_LIBDL
-#include "ff_headers.h"
-#include "ff_stdio.h"
-#endif
-
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -81,16 +76,12 @@ rtems_rtl_obj_cache_flush (rtems_rtl_obj_cache* cache)
 
 bool
 rtems_rtl_obj_cache_read (rtems_rtl_obj_cache* cache,
-                          void*                fd,
+                          int                  fd,
                           UBaseType_t          offset,
                           void**               buffer,
                           size_t*              length)
 {
-#ifdef ipconfigUSE_FAT_LIBDL
-  FF_Stat_t sb;
-#else
   struct stat sb;
-#endif
 
   if (rtems_rtl_trace (RTEMS_RTL_TRACE_CACHE))
     printf ("rtl: cache: %2d: fd=%d offset=%" PRIdoff_t "length=%zu area=[%"
@@ -198,21 +189,11 @@ rtems_rtl_obj_cache_read (rtems_rtl_obj_cache* cache,
               offset, offset + buffer_read,
               (cache->file_size - offset));
 
-#ifdef __rtems__
     if (lseek (fd, offset + buffer_offset, SEEK_SET) < 0)
     {
       rtems_rtl_set_error (errno, "file seek failed");
       return false;
     }
-#elif __freertos__
-#ifdef ipconfigUSE_FAT_LIBDL
-    if (ff_fseek (fd, offset + buffer_offset, FF_SEEK_SET) < 0)
-    {
-      rtems_rtl_set_error (errno, "section load seek failed");
-      return false;
-    }
-#endif
-#endif
 
     /*
      * Loop reading the data from the file until either an error or 0 is
@@ -224,11 +205,7 @@ rtems_rtl_obj_cache_read (rtems_rtl_obj_cache* cache,
 
     while (buffer_read)
     {
-#ifdef __freertos__
-      int r = rtl_freertos_compartment_read(fd, cache->buffer + buffer_offset, offset, buffer_read);
-#else
       int r = read (fd, cache->buffer + buffer_offset, buffer_read);
-#endif
       if (r < 0)
       {
         rtems_rtl_set_error (errno, "file read failed");
@@ -250,15 +227,6 @@ rtems_rtl_obj_cache_read (rtems_rtl_obj_cache* cache,
 
     cache->offset = offset;
 
-#ifdef __freertos__
-    if (cache->fd != fd)
-    {
-      cache->fd = fd;
-      cache->file_size = rtl_freertos_compartment_getsize(fd);
-    }
-#endif
-
-#ifdef __rtems__
     if (cache->fd != fd)
     {
       cache->fd = fd;
@@ -271,7 +239,6 @@ rtems_rtl_obj_cache_read (rtems_rtl_obj_cache* cache,
 
       cache->file_size = sb.st_size;
     }
-#endif
 
   }
 
@@ -280,7 +247,7 @@ rtems_rtl_obj_cache_read (rtems_rtl_obj_cache* cache,
 
 bool
 rtems_rtl_obj_cache_read_byval (rtems_rtl_obj_cache* cache,
-                                void*                fd,
+                                int                  fd,
                                 UBaseType_t          offset,
                                 void*                buffer,
                                 size_t               length)

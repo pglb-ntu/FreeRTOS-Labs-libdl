@@ -19,11 +19,6 @@
 #include "waf_config.h"
 #endif
 
-#ifdef ipconfigUSE_FAT_LIBDL
-#include "ff_headers.h"
-#include "ff_stdio.h"
-#endif
-
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -412,7 +407,7 @@ rtems_rtl_elf_reloc_relocator (rtems_rtl_obj*      obj,
 
 static bool
 rtems_rtl_elf_relocate_worker (rtems_rtl_obj*              obj,
-                               void*                       fd,
+                               int                         fd,
                                rtems_rtl_obj_sect*         sect,
                                rtems_rtl_elf_reloc_handler handler,
                                Elf_Word                    type,
@@ -575,7 +570,7 @@ rtems_rtl_elf_relocate_worker (rtems_rtl_obj*              obj,
 
 static bool
 rtems_rtl_elf_relocs_parser (rtems_rtl_obj*      obj,
-                             void*               fd,
+                             int                 fd,
                              rtems_rtl_obj_sect* sect,
                              void*               data)
 {
@@ -586,7 +581,7 @@ rtems_rtl_elf_relocs_parser (rtems_rtl_obj*      obj,
 
 static bool
 rtems_rtl_elf_relocs_locator (rtems_rtl_obj*      obj,
-                              void*               fd,
+                              int                 fd,
                               rtems_rtl_obj_sect* sect,
                               void*               data)
 {
@@ -596,7 +591,7 @@ rtems_rtl_elf_relocs_locator (rtems_rtl_obj*      obj,
 
 bool
 rtems_rtl_elf_relocs_lo12_locator (rtems_rtl_obj*      obj,
-                                   void*               fd,
+                                   int                 fd,
                                    rtems_rtl_obj_sect* sect,
                                    void*               data)
 {
@@ -693,7 +688,7 @@ typedef struct
 
 static bool
 rtems_rtl_elf_common (rtems_rtl_obj*      obj,
-                      void*               fd,
+                      int                 fd,
                       rtems_rtl_obj_sect* sect,
                       void*               data)
 {
@@ -879,7 +874,7 @@ rtems_rtl_elf_dependents (rtems_rtl_obj* obj, rtems_rtl_elf_reloc_data* reloc)
 
 static bool
 rtems_rtl_elf_symbols_load (rtems_rtl_obj*      obj,
-                            void*               fd,
+                            int                 fd,
                             rtems_rtl_obj_sect* sect,
                             void*               data)
 {
@@ -1235,7 +1230,7 @@ rtems_rtl_elf_symbols_load (rtems_rtl_obj*      obj,
 
 static bool
 rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
-                              void*               fd,
+                              int                 fd,
                               rtems_rtl_obj_sect* sect,
                               void*               data)
 {
@@ -1361,7 +1356,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
 
 static bool
 rtems_rtl_elf_arch_alloc (rtems_rtl_obj*      obj,
-                          void*               fd,
+                          int                 fd,
                           rtems_rtl_obj_sect* sect,
                           void*               data)
 {
@@ -1391,39 +1386,25 @@ rtems_rtl_elf_arch_free (rtems_rtl_obj* obj)
 
 static bool
 rtems_rtl_elf_loader (rtems_rtl_obj*      obj,
-                      void*               fd,
+                      int                 fd,
                       rtems_rtl_obj_sect* sect,
                       void*               data)
 {
   uint8_t* base_offset;
   size_t   len;
 
-#if __rtems__
   if (lseek (fd, obj->ooffset + sect->offset, SEEK_SET) < 0)
   {
     rtems_rtl_set_error (errno, "section load seek failed");
     return false;
   }
-#elif __freertos__
-#ifdef ipconfigUSE_FAT_LIBDL
-  if (ff_fseek (fd, obj->ooffset + sect->offset, FF_SEEK_SET) < 0)
-  {
-    rtems_rtl_set_error (errno, "section load seek failed");
-    return false;
-  }
-#endif
-#endif
 
   base_offset = sect->base;
   len = sect->size;
 
   while (len)
   {
-#if __freertos__
-    ssize_t r = rtl_freertos_compartment_read(fd, base_offset, obj->ooffset + sect->offset, len);
-#else
     ssize_t r = read (fd, base_offset, len);
-#endif
 
     if (r <= 0)
     {
@@ -1438,7 +1419,7 @@ rtems_rtl_elf_loader (rtems_rtl_obj*      obj,
 }
 
 static bool
-rtems_rtl_elf_parse_sections (rtems_rtl_obj* obj, void* fd, Elf_Ehdr* ehdr)
+rtems_rtl_elf_parse_sections (rtems_rtl_obj* obj, int fd, Elf_Ehdr* ehdr)
 {
   rtems_rtl_obj_cache* sects;
   rtems_rtl_obj_cache* strings;
@@ -1661,7 +1642,7 @@ rtems_rtl_elf_add_common (rtems_rtl_obj* obj, size_t size, uint32_t alignment)
 }
 
 bool
-rtems_rtl_elf_file_check (rtems_rtl_obj* obj, void* fd)
+rtems_rtl_elf_file_check (rtems_rtl_obj* obj, int fd)
 {
   rtems_rtl_obj_cache* header;
   Elf_Ehdr             ehdr;
@@ -1799,7 +1780,7 @@ rtems_rtl_elf_load_linkmap (rtems_rtl_obj* obj)
 }
 
 bool
-rtems_rtl_elf_file_load (rtems_rtl_obj* obj, void* fd)
+rtems_rtl_elf_file_load (rtems_rtl_obj* obj, int fd)
 {
   rtems_rtl_obj_cache*      header;
   Elf_Ehdr                  ehdr;
@@ -1986,7 +1967,7 @@ rtems_rtl_elf_file_unload (rtems_rtl_obj* obj)
   rtems_rtl_elf_unwind_deregister (obj);
 
 #if configCHERI_COMPARTMENTALIZATION
-  rtl_freertos_compartment_close(obj);
+  //rtl_freertos_compartment_close(obj);
 #endif /* configCHERI_COMPARTMENTALIZATION */
 
   return true;

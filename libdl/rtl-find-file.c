@@ -17,11 +17,6 @@
 #include "waf_config.h"
 #endif
 
-#ifdef ipconfigUSE_FAT_LIBDL
-#include "ff_headers.h"
-#include "ff_stdio.h"
-#endif
-
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -29,6 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include <rtl/rtl.h>
 #include "rtl-find-file.h"
@@ -46,11 +42,7 @@ rtems_rtl_find_file (const char*  name,
                      const char** file_name,
                      size_t*      size)
 {
-#ifdef ipconfigUSE_FAT_LIBDL
-  FF_Stat_t sb;
-#else
   struct stat sb;
-#endif
 
   *file_name = NULL;
   *size = 0;
@@ -60,11 +52,7 @@ rtems_rtl_find_file (const char*  name,
   // Always search the file system
   if (true)
   {
-#ifdef ipconfigUSE_FAT_LIBDL
-    if (ff_stat (name, &sb) == 0)
-#else
     if (stat (name, &sb) == 0)
-#endif
       *file_name = rtems_rtl_strdup (name);
   }
   else if (paths)
@@ -105,11 +93,7 @@ rtems_rtl_find_file (const char*  name,
       if (rtems_rtl_trace (RTEMS_RTL_TRACE_LOAD))
         printf ("rtl: find-file: path: %s\n", fname);
 
-#ifdef ipconfigUSE_FAT_LIBDL
-      if (ff_stat (name, &sb) == 0)
-#else
       if (stat (fname, &sb) < 0)
-#endif
         rtems_rtl_alloc_del (RTEMS_RTL_ALLOC_OBJECT, fname);
       else
         *file_name = fname;

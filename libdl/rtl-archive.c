@@ -30,6 +30,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <FreeRTOS.h>
 #include "list.h"
@@ -93,23 +95,12 @@ rtems_rtl_scan_decimal (const uint8_t* string, size_t len)
 }
 
 static bool
-rtems_rtl_seek_read (void* fd, UBaseType_t off, size_t len, uint8_t* buffer)
+rtems_rtl_seek_read (int fd, UBaseType_t off, size_t len, uint8_t* buffer)
 {
-#ifdef __freertos__
-#ifdef ipconfigUSE_FAT_LIBDL
-  if (ff_fseek (fd, off, FF_SEEK_SET) < 0)
-    return false;
-  if (ff_fread(buffer, 1, len, (FF_FILE *) fd ) != len)
-    return false;
-#else
-#error "No support in FreeRTOS for loading archives without a filesystem"
-#endif
-#else
   if (lseek (fd, off, SEEK_SET) < 0)
     return false;
   if (read (fd, buffer, len) != len)
     return false;
-#endif
   return true;
 }
 
@@ -366,17 +357,10 @@ rtems_rtl_archive_get (rtems_rtl_archives* archives,
   archive = rtems_rtl_archive_new (archives, path, name);
   if (archive != NULL)
   {
-#ifdef ipconfigUSE_FAT_LIBDL
-    FF_Stat_t sb;
-    if (ff_stat (archive->name, &sb) == 0)
-    {
-      if (sb.st_mode == FF_IFREG)
-#else
     struct stat sb;
     if (stat (archive->name, &sb) == 0)
     {
       if (S_ISREG (sb.st_mode))
-#endif
       {
         rtems_rtl_archive* find_archive;
         find_archive = rtems_rtl_archive_find (archives, archive->name);
@@ -391,14 +375,13 @@ rtems_rtl_archive_get (rtems_rtl_archives* archives,
           archive = find_archive;
         }
         archive->flags &= ~RTEMS_RTL_ARCHIVE_REMOVE;
-#if ffconfigTIME_SUPPORT == 1
+
         if (archive->mtime != sb.st_mtime)
         {
           archive->flags |= RTEMS_RTL_ARCHIVE_LOAD;
           archive->size = sb.st_size;
           archive->mtime = sb.st_mtime;
         }
-#endif
       }
     }
   }
@@ -408,11 +391,7 @@ rtems_rtl_archive_get (rtems_rtl_archives* archives,
 static bool
 rtems_rtl_archives_load_config (rtems_rtl_archives* archives)
 {
-#ifdef ipconfigUSE_FAT_LIBDL
-  FF_Stat_t sb;
-#else
   struct stat sb;
-#endif
 
   if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
     printf ("rtl: archive: config load: %s\n", archives->config_name);
@@ -420,11 +399,7 @@ rtems_rtl_archives_load_config (rtems_rtl_archives* archives)
   if (archives->config_name == NULL)
     return false;
 
-#ifdef ipconfigUSE_FAT_LIBDL
-  if (ff_stat (archives->config_name, &sb) < 0)
-#else
   if (stat (archives->config_name, &sb) < 0)
-#endif
   {
     if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
       printf ("rtl: archive: no config: %s\n", archives->config_name);
@@ -436,7 +411,7 @@ rtems_rtl_archives_load_config (rtems_rtl_archives* archives)
    */
   if (sb.st_mtime != archives->config_mtime)
   {
-    void*   fd;
+    int     fd;
     ssize_t r;
     char*   s;
     bool    in_comment;
@@ -456,13 +431,8 @@ rtems_rtl_archives_load_config (rtems_rtl_archives* archives)
     if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
       printf ("rtl: archive: config load: read %s\n", archives->config_name);
 
-#ifdef ipconfigUSE_FAT_LIBDL
-    fd = ff_fopen (archives->config_name, "r");
-    if (fd == NULL)
-#else
     fd = open (archives->config_name, O_RDONLY);
     if (fd < 0)
-#endif
     {
       rtems_rtl_alloc_del (RTEMS_RTL_ALLOC_OBJECT, (void*) archives->config);
       archives->config = NULL;
@@ -472,18 +442,10 @@ rtems_rtl_archives_load_config (rtems_rtl_archives* archives)
       return false;
     }
 
-#ifdef ipconfigUSE_FAT_LIBDL
-    r = ff_fread((void*) archives->config, 1,  sb.st_size, (FF_FILE *) fd);
-#else
     r = read (fd, (void*) archives->config, sb.st_size);
-#endif
     if (r < 0)
     {
-#ifdef ipconfigUSE_FAT_LIBDL
-      ff_fclose (fd);
-#else
       close (fd);
-#endif
       rtems_rtl_alloc_del (RTEMS_RTL_ALLOC_OBJECT, (void*) archives->config);
       archives->config = NULL;
       archives->config_length = 0;
@@ -492,11 +454,8 @@ rtems_rtl_archives_load_config (rtems_rtl_archives* archives)
       return false;
     }
 
-#ifdef ipconfigUSE_FAT_LIBDL
-    ff_fclose (fd);
-#else
     close (fd);
-#endif
+
     archives->config_length = r;
 
     /*
@@ -635,7 +594,7 @@ rtems_rtl_archive_loader (rtems_rtl_archive* archive, void* data)
 
   if ((archive->flags & RTEMS_RTL_ARCHIVE_LOAD) != 0)
   {
-    void*       fd;
+    int         fd;
     UBaseType_t offset = 0;
     size_t      size = 0;
     const char* name = "/";
@@ -643,13 +602,8 @@ rtems_rtl_archive_loader (rtems_rtl_archive* archive, void* data)
     if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
       printf ("rtl: archive: loader: %s\n", archive->name);
 
-#ifdef ipconfigUSE_FAT_LIBDL
-    fd = ff_fopen (archive->name, "r");
-    if (fd == NULL)
-#else
     fd = open (archive->name, O_RDONLY);
     if (fd < 0)
-#endif
     {
       if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
         printf ("rtl: archive: loader: open error: %s: %s\n",
@@ -682,11 +636,7 @@ rtems_rtl_archive_loader (rtems_rtl_archive* archive, void* data)
                                                      false);
         if (archive->symbols.base == NULL)
         {
-#ifdef ipconfigUSE_FAT_LIBDL
-          ff_fclose (fd);
-#else
           close (fd);
-#endif
           memset (&archive->symbols, 0, sizeof (archive->symbols));
           rtems_rtl_archive_set_error (ENOMEM, "symbol table memory");
           return true;
@@ -699,11 +649,7 @@ rtems_rtl_archive_loader (rtems_rtl_archive* archive, void* data)
       if (!rtems_rtl_seek_read (fd, offset, size, archive->symbols.base))
       {
         rtems_rtl_alloc_del (RTEMS_RTL_ALLOC_SYMBOL, archive->symbols.base);
-#ifdef ipconfigUSE_FAT_LIBDL
-        ff_fclose (fd);
-#else
         close (fd);
-#endif
         memset (&archive->symbols, 0, sizeof (archive->symbols));
         rtems_rtl_archive_set_error (errno, "reading symbols");
         return true;
@@ -718,11 +664,7 @@ rtems_rtl_archive_loader (rtems_rtl_archive* archive, void* data)
       if (archive->symbols.entries >= (SIZE_MAX / sizeof (rtems_rtl_archive_symbol)))
       {
         rtems_rtl_alloc_del (RTEMS_RTL_ALLOC_SYMBOL, archive->symbols.base);
-#ifdef ipconfigUSE_FAT_LIBDL
-        ff_fclose (fd);
-#else
         close (fd);
-#endif
         memset (&archive->symbols, 0, sizeof (archive->symbols));
         rtems_rtl_archive_set_error (errno, "too many symbols");
         return true;
@@ -777,11 +719,7 @@ rtems_rtl_archive_loader (rtems_rtl_archive* archive, void* data)
       }
     }
 
-#ifdef ipconfigUSE_FAT_LIBDL
-    ff_fclose (fd);
-#else
     close (fd);
-#endif
 
     archive->flags &= ~RTEMS_RTL_ARCHIVE_LOAD;
 
@@ -1055,7 +993,7 @@ rtems_rtl_archive_search
 rtems_rtl_archive_single_obj_load (rtems_rtl_archive* archive, size_t obj_offset)
 {
   List_t*              pending;
-  void*                fd;
+  int                  fd;
 
   pending = rtems_rtl_pending_unprotected ();
   rtems_rtl_obj* obj = rtems_rtl_obj_alloc ();
@@ -1069,13 +1007,8 @@ rtems_rtl_archive_single_obj_load (rtems_rtl_archive* archive, size_t obj_offset
 
   obj->aname = rtems_rtl_strdup (archive->name);
 
-#ifdef ipconfigUSE_FAT_LIBDL
-  fd = ff_fopen (obj->aname, "r");
-  if (fd == NULL)
-#else
   fd = open (obj->aname, O_RDONLY);
   if (fd < 0)
-#endif
   {
     if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
       printf ("rtl: archive: load: open error: %s: %s\n",
@@ -1098,11 +1031,7 @@ rtems_rtl_archive_single_obj_load (rtems_rtl_archive* archive, size_t obj_offset
     if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
       printf ("rtl: archive: load: load error: %s:%s\n",
               obj->aname, obj->oname);
-#ifdef ipconfigUSE_FAT_LIBDL
-    ff_fclose (fd);
-#else
     close (fd);
-#endif
     rtems_rtl_obj_free (obj);
     return rtems_rtl_archive_search_error;
   }
@@ -1111,11 +1040,7 @@ rtems_rtl_archive_single_obj_load (rtems_rtl_archive* archive, size_t obj_offset
   obj->ooffset -= RTEMS_RTL_AR_FHDR_SIZE;
   obj->fsize = archive->size;
 
-#ifdef ipconfigUSE_FAT_LIBDL
-  ff_fclose (fd);
-#else
   close (fd);
-#endif
 
   if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
     printf ("rtl: archive: loading: %s:%s@0x%08jx size:%zu\n",
@@ -1165,7 +1090,7 @@ rtems_rtl_archive_obj_load (rtems_rtl_archives* archives,
 {
   rtems_rtl_obj*       obj;
   List_t*              pending;
-  void*                fd;
+  int                  fd;
   size_t               archive_count;
 
   rtems_rtl_archive_obj_data search = {
@@ -1216,7 +1141,7 @@ rtems_rtl_archive_obj_load (rtems_rtl_archives* archives,
 }
 
 bool
-rtems_rtl_obj_archive_find_obj (void*                   fd,
+rtems_rtl_obj_archive_find_obj (int                     fd,
                                 size_t                  fsize,
                                 const char**            name,
                                 UBaseType_t*            ooffset,
@@ -1238,11 +1163,7 @@ rtems_rtl_obj_archive_find_obj (void*                   fd,
   if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
     printf ("rtl: archive: find obj: %s @ 0x%08jx\n", *name, *ooffset);
 
-#ifdef ipconfigUSE_FAT_LIBDL
-  if (ff_fread(&header[0], 1,  RTEMS_RTL_AR_IDENT_SIZE, (FF_FILE *) fd) != RTEMS_RTL_AR_IDENT_SIZE)
-#else
   if (read (fd, &header[0], RTEMS_RTL_AR_IDENT_SIZE) !=  RTEMS_RTL_AR_IDENT_SIZE)
-#endif
   {
     error (errno, "reading archive identifer");
     *ooffset = 0;

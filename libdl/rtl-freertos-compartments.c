@@ -2,14 +2,11 @@
 #include <waf_config.h>
 #endif
 
-#ifdef ipconfigUSE_FAT_LIBDL
-#include "ff_headers.h"
-#include "ff_stdio.h"
-#endif
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include <rtl/rtl.h>
 #include <rtl/rtl-freertos-compartments.h>
 #include <rtl/rtl-allocator.h>
@@ -48,9 +45,15 @@ Compartment_t comp_list[configCOMPARTMENTS_NUM];
 static size_t comp_id_free = 0;
 #endif /* configCHERI_COMPARTMENTALIZATION */
 
-void* rtl_freertos_compartment_open(const char *name)
+#if configCHERI_COMPARTMENTALIZATION
+void
+rtems_rtl_symbol_global_insert (rtems_rtl_symbols* symbols,
+                                rtems_rtl_obj_sym* symbol);
+
+#if 0
+intptr_t rtl_freertos_compartment_open(const char *name)
 {
-  FF_FILE *file = ff_fopen( name, "r" );
+  int file = open( name, O_RDONLY );
 
   if (file == NULL) {
     rtems_rtl_set_error (EBADF, "Failed to open the file");
@@ -74,21 +77,24 @@ bool rtl_freertos_compartment_close(rtems_rtl_obj* obj)
 return true;
 }
 
-size_t rtl_freertos_compartment_read(void* fd, void *buffer, UBaseType_t offset, size_t count)
+size_t rtl_freertos_compartment_read(intptr_t fd, void *buffer, UBaseType_t offset, size_t count)
 {
-  return ff_fread( buffer, 1, count, (FF_FILE *) fd );
+  if (lseek (fd, offset, SEEK_SET) < 0)
+    return 0;
+
+  return read(fd, buffer, count);
 }
 
-size_t rtl_freertos_compartment_getsize(void *fd) {
-  return ((FF_FILE *) fd)->ulFileSize;
+size_t rtl_freertos_compartment_getsize(intptr_t fd) {
+  struct stat sb;
+
+  if (stat ("", &sb) == 0) {
+    return sb.st_size;
+  } else {
+    return 0;
+  }
 }
 
-#if configCHERI_COMPARTMENTALIZATION
-void
-rtems_rtl_symbol_global_insert (rtems_rtl_symbols* symbols,
-                                rtems_rtl_obj_sym* symbol);
-
-#if 0
 size_t
 rtl_freertos_global_symbols_add(rtems_rtl_obj* obj) {
   Elf_Sym*  symtab_start = &__symtab_start;

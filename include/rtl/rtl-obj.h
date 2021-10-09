@@ -54,13 +54,13 @@ typedef struct rtems_rtl_loader_format
  * The type of the format loader check handler. This handler checks the format
  * and if it is detected as suitable it returns true.
  */
-typedef bool (*rtems_rtl_loader_check) (rtems_rtl_obj* obj, void* fd);
+typedef bool (*rtems_rtl_loader_check) (rtems_rtl_obj* obj, int fd);
 
 /**
  * The type of the format loader load handler. This handler loads the specific
  * format.
  */
-typedef bool (*rtems_rtl_loader_load) (rtems_rtl_obj* obj, void* fd);
+typedef bool (*rtems_rtl_loader_load) (rtems_rtl_obj* obj, int fd);
 
 /**
  * The type of the format loader unload handler. This handler unloads the
@@ -274,7 +274,7 @@ struct rtems_rtl_obj
  * @retval false The operation failed and the RTL has been set.
  */
 typedef bool (*rtems_rtl_obj_sect_handler)(rtems_rtl_obj*      obj,
-                                           void*               fd,
+                                           int                 fd,
                                            rtems_rtl_obj_sect* sect,
                                            void*               data);
 
@@ -770,7 +770,7 @@ uint32_t rtems_rtl_obj_bss_alignment (const rtems_rtl_obj* obj);
  * @retval false The relocation failed. The RTL error is set.
  */
 bool rtems_rtl_obj_relocate (rtems_rtl_obj*             obj,
-                             void*                      fd,
+                             int                        fd,
                              rtems_rtl_obj_sect_handler handler,
                              void*                      data);
 
@@ -811,7 +811,7 @@ bool rtems_rtl_obj_relocate_unresolved (rtems_rtl_unresolv_reloc* reloc,
  * @retval false The symbol loading failed. The RTL error is set.
  */
 bool rtems_rtl_obj_load_symbols (rtems_rtl_obj*             obj,
-                                 void*                      fd,
+                                 int                        fd,
                                  rtems_rtl_obj_sect_handler handler,
                                  void*                      data);
 
@@ -828,7 +828,7 @@ bool rtems_rtl_obj_load_symbols (rtems_rtl_obj*             obj,
  */
 bool
 rtems_rtl_obj_alloc_sections (rtems_rtl_obj*             obj,
-                              void*                      fd,
+                              int                        fd,
                               rtems_rtl_obj_sect_handler handler,
                               void*                      data);
 
@@ -845,7 +845,7 @@ rtems_rtl_obj_alloc_sections (rtems_rtl_obj*             obj,
  * @retval false The load failed. The RTL error has been set.
  */
 bool rtems_rtl_obj_load_sections (rtems_rtl_obj*             obj,
-                                  void*                      fd,
+                                  int                        fd,
                                   rtems_rtl_obj_sect_handler handler,
                                   void*                      data);
 
