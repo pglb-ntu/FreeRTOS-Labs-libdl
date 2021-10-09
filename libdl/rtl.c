@@ -498,7 +498,7 @@ rtems_rtl_find_obj (const char* name)
 }
 
 rtems_rtl_obj*
-rtems_rtl_find_obj_with_symbol (const rtems_rtl_obj_sym* sym)
+rtems_rtl_find_obj_with_symbol (const char* sym)
 {
   if (sym != NULL)
   {

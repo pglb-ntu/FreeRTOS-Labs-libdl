@@ -28,7 +28,6 @@
 #include <sys/exec_elf.h>
 
 #if configCHERI_COMPARTMENTALIZATION
-#include <cheric.h>
 #include <cheriintrin.h>
 #include <cheri/cheri-utility.h>
 extern void *pvAlmightyDataCap;
@@ -234,6 +233,8 @@ rtl_cherifreertos_compartment_captable_set_perms (size_t xCompID)
                  __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__);
 
   comp_list[xCompID].captable = captable;
+
+  return true;
 }
 
 #if configCHERI_COMPARTMENTALIZATION_MODE == 1
@@ -526,12 +527,12 @@ rtl_cherifreertos_captable_install_new_cap(rtems_rtl_obj* obj, void* new_cap) {
 #if configCHERI_COMPARTMENTALIZATION_MODE == 1
   if (!obj->captable) {
     rtems_rtl_set_error (EINVAL, "There is no cap table for this object");
-    return NULL;
+    return 0;
   }
 #elif configCHERI_COMPARTMENTALIZATION_MODE == 2
   if (!obj->archive->captable) {
     rtems_rtl_set_error (EINVAL, "There is no cap table for this archive");
-    return NULL;
+    return 0;
   }
 #endif
 
@@ -549,12 +550,12 @@ rtl_cherifreertos_captable_install_new_cap(rtems_rtl_obj* obj, void* new_cap) {
 #if configCHERI_COMPARTMENTALIZATION_MODE == 1
     if (!rtl_cherifreertos_captable_realloc(obj, obj->caps_count + 1)) {
       rtems_rtl_set_error (ENOMEM, "Couldn't realloc a new captable to install a new cap in");
-      return NULL;
+      return 0;
     }
 #elif configCHERI_COMPARTMENTALIZATION_MODE == 2
     if (!rtl_cherifreertos_captable_realloc(obj, obj->archive->caps_count + 1)) {
       rtems_rtl_set_error (ENOMEM, "Couldn't realloc a new captable to install a new cap in");
-      return NULL;
+      return 0;
     }
 #endif
 
@@ -562,7 +563,7 @@ rtl_cherifreertos_captable_install_new_cap(rtems_rtl_obj* obj, void* new_cap) {
     free_slot = rtl_cherifreertos_captable_get_free_slot(obj);
     if (!free_slot) {
       rtems_rtl_set_error (ENOMEM, "Still can not find a free slot after realloc");
-      return NULL;
+      return 0;
     }
   }
 
@@ -606,14 +607,14 @@ rtl_cherifreertos_is_inter_compartment(rtems_rtl_obj* obj, const char* symname) 
   return isInterCompartment;
 }
 
-void* rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t compid)
+void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
 {
   rtems_rtl_obj* kernel_obj = rtems_rtl_baseimage();
   rtems_rtl_obj_sym* tramp_sym;
   rtems_rtl_obj_sym* comp_switch_sym;
   void* tramp_cap_template;
-  volatile uintcap_t* tramp_cap_instance;
-  volatile uintcap_t* global_comp_switch;
+  volatile void** tramp_cap_instance;
+  volatile void* global_comp_switch;
   void **captable = rtl_cherifreertos_compartment_obj_get_captable(kernel_obj);
 
   /* Find the xPortCompartmentTrampSetup template to copy from. This contains metadata such as
@@ -646,7 +647,7 @@ void* rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t comp
   }
 
   /* Copy template trampoline into the newly allocated area of memory */
-  memcpy(tramp_cap_instance, tramp_cap_template, tramp_sym->size);
+  memcpy((void *) tramp_cap_instance, (void *) tramp_cap_template, tramp_sym->size);
 
   /* Setup code cap in the trampoline */
   tramp_cap_instance[0] = code;
@@ -679,13 +680,13 @@ void* rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t comp
   return &tramp_cap_instance[3];
 }
 
-void rtl_cherifreertos_compartment_register_faultHandler(BaseType_t compid, void* handler)
+void rtl_cherifreertos_compartment_register_faultHandler(size_t compid, void* handler)
 {
 #if configCHERI_COMPARTMENTALIZATION_MODE == 1
   rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
 
   if (obj == NULL) {
-    printf("Couldn't find an object for compid %d\n", compid);
+    printf("Couldn't find an object for compid %zu\n", compid);
     return;
   }
 
@@ -694,7 +695,7 @@ void rtl_cherifreertos_compartment_register_faultHandler(BaseType_t compid, void
   rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
 
   if (archive == NULL) {
-    printf("Couldn't find an archive for compid %d\n", compid);
+    printf("Couldn't find an archive for compid %zu\n", compid);
     return;
   }
 
@@ -702,8 +703,8 @@ void rtl_cherifreertos_compartment_register_faultHandler(BaseType_t compid, void
 #endif
 }
 
-bool
-rtl_cherifreertos_compartment_faultHandler(BaseType_t compid) {
+__attribute__((section(".text.fast"))) bool
+rtl_cherifreertos_compartment_faultHandler(size_t compid) {
   BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
   PendedFunction_t func = NULL;
 
@@ -711,7 +712,7 @@ rtl_cherifreertos_compartment_faultHandler(BaseType_t compid) {
   rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
 
   if (obj == NULL) {
-    printf("Couldn't find an object for compid %d\n", compid);
+    printf("Couldn't find an object for compid %zu\n", compid);
     return false;
   }
 
@@ -727,7 +728,7 @@ rtl_cherifreertos_compartment_faultHandler(BaseType_t compid) {
   rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
 
   if (archive == NULL) {
-    printf("Couldn't find an archive for compid %d\n", compid);
+    printf("Couldn't find an archive for compid %zu\n", compid);
     return false;
   }
 
@@ -749,7 +750,7 @@ rtl_cherifreertos_compartment_faultHandler(BaseType_t compid) {
 }
 
 bool
-rtl_cherifreertos_compartment_init_resources (BaseType_t compid)
+rtl_cherifreertos_compartment_init_resources (size_t compid)
 {
   FreeRTOSCompartmentResources_t* pCompResTable = rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT,
                                                    sizeof (FreeRTOSCompartmentResources_t),
@@ -777,7 +778,7 @@ rtl_cherifreertos_compartment_init_resources (BaseType_t compid)
   rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
 
   if (obj == NULL) {
-    printf("Couldn't find an object for compid %d\n", compid);
+    printf("Couldn't find an object for compid %zu\n", compid);
     return false;
   }
 
@@ -786,7 +787,7 @@ rtl_cherifreertos_compartment_init_resources (BaseType_t compid)
   rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
 
   if (archive == NULL) {
-    printf("Couldn't find an archive for compid %d\n", compid);
+    printf("Couldn't find an archive for compid %zu\n", compid);
     return false;
   }
 
@@ -797,7 +798,7 @@ rtl_cherifreertos_compartment_init_resources (BaseType_t compid)
 }
 
 void
-rtl_cherifreertos_compartment_add_resource(BaseType_t compid,
+rtl_cherifreertos_compartment_add_resource(size_t compid,
                                            FreeRTOSResource_t xResource)
 {
   FreeRTOSCompartmentResources_t* pCompResTable = NULL;
@@ -805,7 +806,7 @@ rtl_cherifreertos_compartment_add_resource(BaseType_t compid,
   FreeRTOSResource_t* newRes = pvPortMalloc (sizeof (FreeRTOSResource_t));
 
   if (newRes == NULL) {
-    printf("Failed to add %d resource to compartment %d\n", xResource.type, compid);
+    printf("Failed to add %d resource to compartment %zu\n", (int) xResource.type, compid);
     return;
   }
 
@@ -823,7 +824,7 @@ rtl_cherifreertos_compartment_add_resource(BaseType_t compid,
 #endif
 
   if (pCompResTable == NULL) {
-    printf("No resources table found for compartment %d\n", compid);
+    printf("No resources table found for compartment %zu\n", compid);
     return;
   }
 
@@ -832,7 +833,7 @@ rtl_cherifreertos_compartment_add_resource(BaseType_t compid,
 }
 
 void
-rtl_cherifreertos_compartment_remove_resource(BaseType_t compid,
+rtl_cherifreertos_compartment_remove_resource(size_t compid,
                                               FreeRTOSResource_t xResource)
 {
   FreeRTOSCompartmentResources_t* pCompResTable = NULL;
@@ -848,7 +849,7 @@ rtl_cherifreertos_compartment_remove_resource(BaseType_t compid,
 #endif
 
   if (pCompResTable == NULL) {
-    printf("No resources table found for compartment %d\n", compid);
+    printf("No resources table found for compartment %zu\n", compid);
     return;
   }
 
@@ -861,7 +862,7 @@ rtl_cherifreertos_compartment_remove_resource(BaseType_t compid,
     FreeRTOSResource_t* res = (FreeRTOSResource_t *) node;
 
     if (res->handle == xResource.handle) {
-      uxListRemove(res);
+      uxListRemove(node);
       return;
     }
 
@@ -883,7 +884,7 @@ rtl_cherifreertos_compartment_revoke_tasks(FreeRTOSCompartmentResources_t* pComp
   {
     FreeRTOSResource_t* res = (FreeRTOSResource_t *) node;
 
-    uxListRemove(res);
+    uxListRemove(node);
     vTaskDelete(res->handle);
 
     node = listGET_NEXT (node);
@@ -891,7 +892,7 @@ rtl_cherifreertos_compartment_revoke_tasks(FreeRTOSCompartmentResources_t* pComp
 }
 
 void
-rtl_cherifreertos_compartment_revoke_resources(BaseType_t compid) {
+rtl_cherifreertos_compartment_revoke_resources(size_t compid) {
 FreeRTOSCompartmentResources_t* pCompResTable = NULL;
 
 #if configCHERI_COMPARTMENTALIZATION_MODE == 1
@@ -905,7 +906,7 @@ FreeRTOSCompartmentResources_t* pCompResTable = NULL;
 #endif
 
   if (pCompResTable == NULL) {
-    printf("No resources table found for compartment %d\n", compid);
+    printf("No resources table found for compartment %zu\n", compid);
     return;
   }
 
@@ -924,9 +925,9 @@ void rtl_cherifreertos_debug_print_compartments(void) {
     void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
     size_t xCompID = rtl_cherifreertos_compartment_get_compid(obj);
 
-    printf("rtl:debug: %s@0x%x\t\n", obj->oname, obj->text_base);
-    printf("compid = #%u ", xCompID);
-    printf("captab = %p\n", captable);
+    printf("rtl:debug: %s@0x%x\t", obj->oname, (unsigned int)(uintptr_t) obj->text_base);
+    printf("compid = #%3zu ", xCompID);
+    printf("captab = %16p\n", captable);
 
     node = listGET_NEXT (node);
   }

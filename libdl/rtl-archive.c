@@ -621,8 +621,8 @@ rtems_rtl_archive_loader (rtems_rtl_archive* archive, void* data)
                                         rtems_rtl_archive_set_error))
     {
       if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
-        printf ("rtl: archive: loader: symbols: off=0x%08jx size=%zu\n",
-                offset, size);
+        printf ("rtl: archive: loader: symbols: off=0x%08lx size=%zu\n",
+                (unsigned long) offset, size);
 
       /*
        * Reallocate the symbol table memory if it has changed size.
@@ -1043,8 +1043,8 @@ rtems_rtl_archive_single_obj_load (rtems_rtl_archive* archive, size_t obj_offset
   close (fd);
 
   if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
-    printf ("rtl: archive: loading: %s:%s@0x%08jx size:%zu\n",
-            obj->aname, obj->oname, obj->ooffset, obj->fsize);
+    printf ("rtl: archive: loading: %s:%s@0x%08lx size:%zu\n",
+            obj->aname, obj->oname, (unsigned long) obj->ooffset, obj->fsize);
 
   vListInitialiseItem (&obj->link);
   vListInsertEnd (pending, &obj->link);
@@ -1053,8 +1053,8 @@ rtems_rtl_archive_single_obj_load (rtems_rtl_archive* archive, size_t obj_offset
   if (!rtems_rtl_obj_load (obj))
   {
     if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
-      printf ("rtl: archive: loading: error: %s:%s@0x%08jx: %s\n",
-              obj->aname, obj->oname, obj->ooffset,
+      printf ("rtl: archive: loading: error: %s:%s@0x%08lx: %s\n",
+              obj->aname, obj->oname, (unsigned long) obj->ooffset,
               rtems_rtl_last_error_unprotected ());
     uxListRemove (&obj->link);
     rtems_rtl_obj_free (obj);
@@ -1068,7 +1068,7 @@ rtems_rtl_archive_single_obj_load (rtems_rtl_archive* archive, size_t obj_offset
       rtems_rtl_obj_sym* sym = rtems_rtl_gsymbol_obj_find (obj, "CheriFreeRTOS_FaultHandler");
 
       if (sym) {
-        printf("Registering obj->archive->comp_id = %d\n", archive->comp_id);
+        printf("Registering fault handler for obj->archive->comp_id = %u\n", (unsigned) archive->comp_id);
         rtl_cherifreertos_compartment_register_faultHandler(archive->comp_id, archive->captable[sym->capability]);
       }
   #endif
@@ -1076,8 +1076,8 @@ rtems_rtl_archive_single_obj_load (rtems_rtl_archive* archive, size_t obj_offset
   rtems_rtl_obj_caches_flush ();
 
   if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
-    printf ("rtl: archive: loading: loaded: %s:%s@0x%08jx\n",
-            obj->aname, obj->oname, obj->ooffset);
+    printf ("rtl: archive: loading: loaded: %s:%s@0x%08lx\n",
+            obj->aname, obj->oname, (unsigned long) obj->ooffset);
 
   return rtems_rtl_archive_search_loaded;
 
@@ -1161,7 +1161,7 @@ rtems_rtl_obj_archive_find_obj (int                     fd,
   }
 
   if (rtems_rtl_trace (RTEMS_RTL_TRACE_ARCHIVES))
-    printf ("rtl: archive: find obj: %s @ 0x%08jx\n", *name, *ooffset);
+    printf ("rtl: archive: find obj: %s @ 0x%08lx\n", *name, (unsigned long) *ooffset);
 
   if (read (fd, &header[0], RTEMS_RTL_AR_IDENT_SIZE) !=  RTEMS_RTL_AR_IDENT_SIZE)
   {

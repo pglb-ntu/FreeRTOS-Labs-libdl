@@ -48,7 +48,7 @@
 static rtems_rtl_obj_sym global_sym_add =
 {
   .name  = "rtems_rtl_base_sym_global_add",
-  .value = (void*) rtems_rtl_base_sym_global_add
+  .value = (uintptr_t) rtems_rtl_base_sym_global_add
 };
 
 static uint_fast32_t
@@ -237,7 +237,7 @@ rtems_rtl_symbol_global_add (rtems_rtl_obj*       obj,
 #endif
 
     if (rtems_rtl_trace (RTEMS_RTL_TRACE_GLOBAL_SYM))
-      printf ("rtl: esyms: %s -> 0x%x\n", sym->name, sym->value);
+      printf ("rtl: esyms: %s -> %p\n", sym->name, (void *) sym->value);
     if (rtems_rtl_symbol_global_find (sym->name) == NULL)
       rtems_rtl_symbol_global_insert (symbols, sym);
     ++sym;
@@ -524,7 +524,7 @@ bool
 rtems_rtl_isymbol_create (rtems_rtl_obj* obj, isymbol_table_mode_t mode)
 {
   char *istring = NULL;
-  char *name = NULL;
+  const char *name = NULL;
   size_t slen = 0;
 
   // Copy all the globals to the interface list. Ang global symbol in this
@@ -670,7 +670,7 @@ rtems_rtl_symbol_global_find_by_address (size_t target_pc)
 
       if ( (target_pc >= sym_addr) && (target_pc < (sym_addr + sym->size)))
       {
-          printf("%s0x%x: %s%s%s<%s+%d>\n", KBLU, (size_t) target_pc, KGRN, obj->oname, KYEL, sym->name, target_pc - sym_addr);
+          printf("%s0x%x: %s%s%s<%s+%x>\n", KBLU, (unsigned int) target_pc, KGRN, obj->oname, KYEL, sym->name, (unsigned int) (target_pc - sym_addr));
           void** captab = rtl_cherifreertos_compartment_obj_get_captable(obj);
           return (void *) captab[sym->capability];
       }
@@ -710,8 +710,8 @@ rtl_cherifreertos_compartment_backtrace(void* pc, void* sp, void* ret_reg, size_
   for (s = 0, sym = obj->global_table; func_addr == NULL && s < obj->global_syms; ++s, ++sym) {
     sym_addr = sym->value;
     if ( target_pc >= sym_addr && target_pc < sym_addr + sym->size) {
-      printf("%s0x%x: %s%s%s<%s+%d>\n", KBLU, (size_t) pc, KGRN, obj->oname, KYEL, sym->name, pc - sym->value);
-      func_addr = sym->value;
+      printf("%s0x%x: %s%s%s<%s+0x%x>\n", KBLU, (unsigned int) (uintptr_t) pc, KGRN, obj->oname, KYEL, sym->name, (unsigned int)(uintptr_t)(pc - sym->value));
+      func_addr = (void *) sym->value;
       break;
     }
   }
@@ -720,8 +720,8 @@ rtl_cherifreertos_compartment_backtrace(void* pc, void* sp, void* ret_reg, size_
   for (s = 0, sym = obj->local_table; func_addr == NULL && s < obj->local_syms; ++s, ++sym) {
     sym_addr = sym->value;
     if ( target_pc >= sym_addr && target_pc < sym_addr + sym->size) {
-      printf("%s0x%x: %s%s%s<%s+%d>\n", KBLU, (size_t) pc, KGRN, obj->oname, KYEL, sym->name, pc - sym->value);
-      func_addr = sym->value;
+      printf("%s0x%x: %s%s%s<%s+0x%x>\n", KBLU, (unsigned int) (uintptr_t) pc, KGRN, obj->oname, KYEL, sym->name,  (unsigned int)(uintptr_t)(pc - sym->value));
+      func_addr = (void *) sym->value;
       break;
     }
   }
@@ -780,7 +780,7 @@ rtl_cherifreertos_compartment_backtrace(void* pc, void* sp, void* ret_reg, size_
       // If it was a compartment_switch, get the previous compartment ID
       if (tramp_switch_instructions[0] == prev_cra_instruction) {
         prevCompID = (size_t) *((size_t *) (prev_csp - 0 * sizeof(void *)));
-        printf("%s0x%x: %s<compartment_switch>\n", KBLU, (size_t) prev_cra, KCYN);
+        printf("%s0x%x: %s<compartment_switch>\n", KBLU, (unsigned int) (uintptr_t) prev_cra, KCYN);
       }
 
       // If the previous compartment ID is valid, unwind the trampoline and recursively
@@ -804,6 +804,8 @@ rtl_cherifreertos_compartment_backtrace(void* pc, void* sp, void* ret_reg, size_
     printf("%s", KNRM);
     return NULL;
   }
+
+  return func_addr;
 }
 #endif
 

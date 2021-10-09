@@ -194,43 +194,43 @@ rtl_cherifreertos_compartment_obj_get_captable(rtems_rtl_obj* obj);
  * Create a new inter-compartment trampoline for external domain-crossing calls
  */
 void*
-rtl_cherifreertos_compartments_setup_ecall(uintcap_t code, BaseType_t compid);
+rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid);
 
 /**
  * Register a fault handler for a compartment passed in handler.
  */
 void
-rtl_cherifreertos_compartment_register_faultHandler(BaseType_t compid, void* handler);
+rtl_cherifreertos_compartment_register_faultHandler(size_t compid, void* handler);
 
 /**
  * Call a fault handler of a compartment.
  * Return true if a reschedule is required
  */
 bool
-rtl_cherifreertos_compartment_faultHandler(BaseType_t compid);
+rtl_cherifreertos_compartment_faultHandler(size_t compid);
 
 /**
  * Initialize data structures needed to bookkeep run-time allocated FreeRTOS
  * resourced per compartment.
  */
 bool
-rtl_cherifreertos_compartment_init_resources (BaseType_t compid);
+rtl_cherifreertos_compartment_init_resources (size_t compid);
 
 /**
  * Add/Delete FreeRTOS allocated resoucres to a compartment.
  */
 void
-rtl_cherifreertos_compartment_add_resource(BaseType_t compid,
+rtl_cherifreertos_compartment_add_resource(size_t compid,
                                            FreeRTOSResource_t xResource);
 void
-rtl_cherifreertos_compartment_remove_resource(BaseType_t compid,
+rtl_cherifreertos_compartment_remove_resource(size_t compid,
                                               FreeRTOSResource_t xResource);
 
 /**
  * Iterate over all compartment-owned resources and revoke them
  */
 void
-rtl_cherifreertos_compartment_revoke_resources(BaseType_t compid);
+rtl_cherifreertos_compartment_revoke_resources(size_t compid);
 
 /**
  * Trace the stack and function calls from a given @pc across CHERI compartments

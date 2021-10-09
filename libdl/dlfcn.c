@@ -18,12 +18,12 @@
 #include <stdint.h>
 #include <dlfcn.h>
 #include <rtl/rtl.h>
-#include <rtl/rtl-freertos-compartments.h>
 #include <sys/exec_elf.h>
 
 #include <FreeRTOSConfig.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
+#include <rtl/rtl-freertos-compartments.h>
 #include <cheri/cheri-utility.h>
 #endif
 
@@ -118,7 +118,7 @@ dlsym (void* handle, const char *symbol)
 {
   rtems_rtl_obj*     obj;
   rtems_rtl_obj_sym* sym = NULL;
-  void*              symval = NULL;
+  uintptr_t          symval = 0;
 
   if (!rtems_rtl_lock ())
     return NULL;
@@ -146,20 +146,20 @@ dlsym (void* handle, const char *symbol)
 #if configCHERI_COMPARTMENTALIZATION
     void* tramp_cap;
     void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
-    symval = captable[sym->capability];
+    symval = (uintptr_t) captable[sym->capability];
     /* Setup a compartment switch trampoline if it is a function */
     if (ELF_ST_TYPE(sym->data >> 16) == STT_FUNC) {
-      tramp_cap = rtl_cherifreertos_compartments_setup_ecall(symval, rtl_cherifreertos_compartment_get_compid(obj));
+      tramp_cap = rtl_cherifreertos_compartments_setup_ecall((void*) symval, rtl_cherifreertos_compartment_get_compid(obj));
       if (tramp_cap == NULL)
         return NULL;
       else
-        symval = tramp_cap;
+        symval = (uintptr_t) tramp_cap;
     }
 #endif
 
   rtems_rtl_unlock ();
 
-  return symval;
+  return (void*) symval;
 }
 
 const char*

@@ -277,7 +277,7 @@ rtems_rtl_unresolved_resolve_reloc (rtems_rtl_unresolv_rec* rec,
                    rec->rec.reloc.obj->oname);
         } else {
           if (rtems_rtl_trace (RTEMS_RTL_TRACE_UNRESOLVED))
-            printf("rtl: unresolv: failed to mint symbol from object: %s -> object: %s\n",
+            printf("rtl: unresolv: failed to mint %s symbol from object: %s -> object: %s\n",
                    rd->name_rec->rec.name.name,
                    obj->oname,
                    rec->rec.reloc.obj->oname);
@@ -285,7 +285,7 @@ rtems_rtl_unresolved_resolve_reloc (rtems_rtl_unresolv_rec* rec,
         }
       } else {
           if (rtems_rtl_trace (RTEMS_RTL_TRACE_UNRESOLVED))
-            printf("rtl: unresolv: failed to mint symbol from object: %s -> object: %s\n",
+            printf("rtl: unresolv: failed to mint %s symbol from object: %s -> object: %s\n",
                    rd->name_rec->rec.name.name,
                    obj->oname,
                    rec->rec.reloc.obj->oname);
@@ -830,9 +830,9 @@ rtems_rtl_unresolved_dump_iterator (rtems_rtl_unresolv_rec* rec,
   case rtems_rtl_unresolved_reloc:
   case rtems_rtl_trampoline_reloc:
     if (dd->show_relocs)
-      printf (" %3zu: 2:reloc%c: obj:%s name:%2d: sect:%d\n",
+      printf (" %3d: 2:reloc%c: obj:%s name:%2d: sect:%d\n",
               rec->type == rtems_rtl_unresolved_reloc ? 'R' : 'T',
-              dd->rec,
+              (int) dd->rec,
               rec->rec.reloc.obj == NULL ? "resolved" : rec->rec.reloc.obj->oname,
               rec->rec.reloc.name,
               rec->rec.reloc.sect);

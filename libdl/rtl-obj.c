@@ -678,7 +678,7 @@ bool
 rtems_rtl_obj_add_dependent (rtems_rtl_obj* obj, rtems_rtl_obj* dependent)
 {
   rtems_rtl_obj**   free_slot;
-  ListItem_t*       node;
+  const ListItem_t* node;
 
   if (obj == dependent || dependent == rtems_rtl_baseimage ())
     return false;

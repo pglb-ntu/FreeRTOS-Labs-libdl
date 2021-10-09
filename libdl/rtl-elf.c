@@ -293,7 +293,7 @@ rtems_rtl_elf_reloc_parser (rtems_rtl_obj*      obj,
      * Find the symbol's object file. It cannot be NULL so ignore that result
      * if returned, it means something is corrupted. We are in an iterator.
      */
-    rtems_rtl_obj*  sobj = rtems_rtl_find_obj_with_symbol (symbol);
+    rtems_rtl_obj*  sobj = rtems_rtl_find_obj_with_symbol (symname);
     if (sobj != NULL)
     {
       /*
@@ -387,7 +387,7 @@ rtems_rtl_elf_reloc_relocator (rtems_rtl_obj*      obj,
         return false;
     }
 
-    sobj = rtems_rtl_find_obj_with_symbol (symbol);
+    sobj = rtems_rtl_find_obj_with_symbol (symname);
 
     if (rtems_rtl_trace (RTEMS_RTL_TRACE_DEPENDENCY))
       printf ("rtl: depend: %s -> %s:%s\n",
@@ -660,7 +660,7 @@ rtems_rtl_obj_relocate_unresolved (rtems_rtl_unresolv_reloc* reloc,
       reloc->obj->flags &= ~RTEMS_RTL_OBJ_UNRESOLVED;
   }
 
-  sobj = rtems_rtl_find_obj_with_symbol (sym);
+  sobj = rtems_rtl_find_obj_with_symbol (sym->name);
 
   if (rtems_rtl_trace (RTEMS_RTL_TRACE_DEPENDENCY))
     printf ("rtl: depend: %s -> %s:%s\n",
@@ -1115,7 +1115,7 @@ rtems_rtl_elf_symbols_load (rtems_rtl_obj*      obj,
       {
         rtems_rtl_obj_sym*  osym;
         char*               string;
-        Elf_Word            value;
+        uintptr_t           value;
         const char*         name;
 
         off = obj->ooffset + strtab->offset + symbol.st_name;
@@ -1208,7 +1208,7 @@ rtems_rtl_elf_symbols_load (rtems_rtl_obj*      obj,
 
         memcpy (string, name, strlen (name) + 1);
         osym->name = string;
-        osym->value = (uint8_t*) value;
+        osym->value = value;
         osym->data = symbol.st_shndx;
         osym->data |= (symbol.st_info << 16);
         osym->size = symbol.st_size;
@@ -1219,7 +1219,7 @@ rtems_rtl_elf_symbols_load (rtems_rtl_obj*      obj,
                   sym, (int) symbol.st_name, osym->name,
                   (int) ELF_ST_BIND (symbol.st_info),
                   (int) ELF_ST_TYPE (symbol.st_info),
-                  osym->value, symbol.st_shndx,
+                  (void*) osym->value, symbol.st_shndx,
                   (int) symbol.st_size);
       }
     }
@@ -1273,7 +1273,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
         }
 
         if (!osym->capability) {
-          printf("Failed to install a new cap\n");
+          printf("Failed to install a new cap for %s:%s\n", obj->oname, osym->name);
           return false;
         }
 
@@ -1287,7 +1287,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
 #endif
         if (rtems_rtl_trace (RTEMS_RTL_TRACE_SYMBOL))
           printf ("rtl: sym:locate:local :%-4d name: %-20s val:%-8p sect:%-3d (%s, %p)\n",
-                  sym, osym->name, osym->value, osym->data & 0xffffu,
+                  sym, osym->name, (void *) osym->value, osym->data & 0xffffu,
                   symsect->name, symsect->base);
       }
   }
@@ -1343,7 +1343,7 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
 #endif
         if (rtems_rtl_trace (RTEMS_RTL_TRACE_SYMBOL))
           printf ("rtl: sym:locate:global:%-4d name: %-20s val:%-8p sect:%-3d (%s, %p)\n",
-                  sym, osym->name, osym->value, osym->data & 0xffffu,
+                  sym, osym->name, (void*) osym->value, osym->data & 0xffffu,
                   symsect->name, symsect->base);
       }
   }

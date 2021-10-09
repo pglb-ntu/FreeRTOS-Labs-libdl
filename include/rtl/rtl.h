@@ -270,7 +270,7 @@ rtems_rtl_obj* rtems_rtl_find_obj (const char* name);
  * @retval NULL No object file found.
  * @return rtems_rtl_obj* Reference to the symbol.
  */
-rtems_rtl_obj* rtems_rtl_find_obj_with_symbol (const rtems_rtl_obj_sym* sym);
+rtems_rtl_obj* rtems_rtl_find_obj_with_symbol (const char* sym);
 
 /**
  * Load an object file into memory relocating it. It will not be resolved

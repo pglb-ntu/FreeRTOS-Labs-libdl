@@ -64,7 +64,7 @@
 typedef struct rela_hi20 {
   ListItem_t  node;
   Elf_Word    symvalue;
-  Elf_Word    *hi20_pc;
+  intptr_t    hi20_pc;
 } hi20_reloc_t;
 
 static List_t hi20_relocs;
@@ -78,7 +78,7 @@ typedef struct rela_hi20_table {
 static hi20_relocs_t hi20_relocs_table;
 
 static uint_fast32_t
-rtems_hi20_hash (const Elf_Word *hi20_pc)
+rtems_hi20_hash (const intptr_t hi20_pc)
 {
   return ((uint_fast32_t) hi20_pc) & 0xffffffff;
 }
@@ -93,7 +93,7 @@ rtems_rtl_hi20_insert (hi20_relocs_t*     relocs,
 }
 
 static hi20_reloc_t*
-rtems_rtl_hi20_find (Elf_Word hi20_pc)
+rtems_rtl_hi20_find (intptr_t hi20_pc)
 {
   hi20_relocs_t*       relocs;
   uint_fast32_t        hash;
@@ -320,10 +320,10 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
   Elf_Word local = 0;
 
   char bits = (sizeof(Elf_Word) * 8);
-  where = (Elf_Addr *)(sect->base + rela->r_offset);
+  where = (Elf_Word *)(sect->base + rela->r_offset);
 
   // Final PCREL value
-  Elf_Word pcrel_val = symvalue - ((Elf_Word) where);
+  Elf_Word pcrel_val = symvalue - ((intptr_t) where);
 
   if (ELF_ST_TYPE (syminfo >> 16) == STT_SECTION) {
     local = 1;
@@ -340,12 +340,12 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
       uint64_t lo;
       hi20_reloc_t *ret_reloc;
       Elf_Word return_sym;
-      Elf_Addr hi20_rela_pc =  ((Elf_Word) where) + pcrel_val;
+      intptr_t hi20_rela_pc =  ((intptr_t) where) + pcrel_val;
 
       ret_reloc = rtems_rtl_hi20_find(hi20_rela_pc);
       if (!ret_reloc) {
         rtems_rtl_set_error (EINVAL,
-                           "%s: Failed to find HI20 relocation for type %ld",
+                           "%s: Failed to find HI20 relocation for type %d",
                            sect->name, (uint32_t) ELF_R_TYPE(rela->r_info));
         return rtems_rtl_elf_rel_failure;
           return rtems_rtl_elf_rel_no_error;
@@ -364,12 +364,12 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
       uint64_t lo;
       hi20_reloc_t *ret_reloc;
       Elf_Word return_sym;
-      Elf_Addr hi20_rela_pc =  ((Elf_Word) where) + pcrel_val;
+      intptr_t hi20_rela_pc =  ((intptr_t) where) + pcrel_val;
 
       ret_reloc = rtems_rtl_hi20_find(hi20_rela_pc);
       if (!ret_reloc) {
         rtems_rtl_set_error (EINVAL,
-                           "%s: Failed to find HI20 relocation for type %ld",
+                           "%s: Failed to find HI20 relocation for type %d",
                            sect->name, (uint32_t) ELF_R_TYPE(rela->r_info));
         return rtems_rtl_elf_rel_failure;
       } else {
@@ -510,14 +510,8 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
     write64le(where, read64le(where) - symvalue);
     break;
 
-  case R_TYPE(32_PCREL): {
+  case R_TYPE(32_PCREL):
     write32le(where, pcrel_val);
-
-    if (rtems_rtl_trace (RTEMS_RTL_TRACE_RELOC))
-      printf ("rtl: R_RISCV_32_PCREL %p @ %p in %s\n",
-              (void *) * (where), where, rtems_rtl_obj_oname (obj));
-
-  }
   break;
 
   case R_TYPE(PCREL_HI20): {
@@ -528,7 +522,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
     vListInitialiseItem(&hi20_reloc->node);
 
     hi20_reloc->symvalue = symvalue;
-    hi20_reloc->hi20_pc = where;
+    hi20_reloc->hi20_pc = (intptr_t) where;
 
     rtems_rtl_hi20_insert(&hi20_relocs_table, hi20_reloc);
 
@@ -590,7 +584,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
     if (rtl_sym) {
        void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
 
-       *((__uintcap_t *) where) = captable[rtl_sym->capability];
+       *((__uintcap_t *) where) = (__uintcap_t) captable[rtl_sym->capability];
        return rtems_rtl_elf_rel_no_error;
     } else {
       rtems_rtl_set_error (EINVAL, "Couldn't find the symbol with CHERI_CAPABILITY reloc\n");
@@ -726,7 +720,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
   case R_TYPE(CHERI_CJAL):
   case R_TYPE(CHERI_RVC_CJUMP):
   case R_TYPE(CHERI_CCALL): {
-    printf("Warning: Unimplemented CHERI call/jump %d reloc\n", ELF_R_TYPE(rela->r_info));
+    printf("Warning: Unimplemented CHERI call/jump %d reloc\n", (int) ELF_R_TYPE(rela->r_info));
     return rtems_rtl_elf_rel_no_error;
   }
 
@@ -734,7 +728,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
 #endif
   default:
     rtems_rtl_set_error (EINVAL,
-                         "%s: Unsupported relocation type %ld "
+                         "%s: Unsupported relocation type %u "
                          "in non-PLT relocations",
                          sect->name, (uint32_t) ELF_R_TYPE(rela->r_info));
     return rtems_rtl_elf_rel_failure;
