@@ -22,6 +22,9 @@
 extern "C" {
 #endif /* __cplusplus */
 
+void * pvRTLMalloc( size_t xWantedSize );
+void vRTLFree( void * pv );
+
 /**
  * Allocator handler for the standard libc heap.
  *

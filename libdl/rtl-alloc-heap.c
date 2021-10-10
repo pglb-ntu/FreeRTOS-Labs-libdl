@@ -42,17 +42,23 @@ rtems_rtl_alloc_heap (rtems_rtl_alloc_cmd cmd,
   switch (cmd)
   {
     case RTEMS_RTL_ALLOC_NEW:
-      if (tag == RTEMS_RTL_ALLOC_CAPTAB) {
-        *address = rtems_rtl_alloc_heap_aligned (size, 0x1000);
+      if (tag == RTEMS_RTL_ALLOC_CAPTAB ||
+          tag == RTEMS_RTL_ALLOC_READ   ||
+          tag == RTEMS_RTL_ALLOC_READ_WRITE ||
+          tag == RTEMS_RTL_ALLOC_READ_EXEC) {
+        *address = rtems_rtl_alloc_heap_aligned (size, 16);
       } else {
-        *address = pvPortMalloc (size);
+        *address = pvRTLMalloc (size);
       }
       break;
     case RTEMS_RTL_ALLOC_DEL:
-      if (tag == RTEMS_RTL_ALLOC_CAPTAB) {
+      if (tag == RTEMS_RTL_ALLOC_CAPTAB ||
+          tag == RTEMS_RTL_ALLOC_READ   ||
+          tag == RTEMS_RTL_ALLOC_READ_WRITE ||
+          tag == RTEMS_RTL_ALLOC_READ_EXEC) {
         vPortFree(((void**) *address)[-1]);
       } else {
-        vPortFree (*address);
+        vRTLFree (*address);
       }
       *address = NULL;
       break;

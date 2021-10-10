@@ -640,7 +640,7 @@ void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
   global_comp_switch = captable[comp_switch_sym->capability];
 
   /* Allocate memory for the new setup trampoline */
-  tramp_cap_instance = rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, tramp_sym->size, true);
+  tramp_cap_instance = rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_READ_EXEC, tramp_sym->size, true);
   if (tramp_cap_instance == NULL) {
     printf("Failed to allocate a new trampoline to do external calls\n");
     return NULL;
