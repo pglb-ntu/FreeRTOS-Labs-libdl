@@ -37,6 +37,7 @@
 #include <rtl/rtl-freertos-compartments.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
+#include <cheriintrin.h>
 #include <cheri/cheri-utility.h>
 #endif
 
@@ -1269,6 +1270,9 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
           __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
 
+          /* Create a sentry cap */
+          cap = cheri_sentry_create(cap);
+
           osym->capability = rtl_cherifreertos_captable_install_new_cap(obj, cap);
         }
 
@@ -1324,6 +1328,9 @@ rtems_rtl_elf_symbols_locate (rtems_rtl_obj*      obj,
           __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE__ | \
           __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__);
+
+          /* Create a sentry cap */
+          cap = cheri_sentry_create(cap);
 
           osym->capability = rtl_cherifreertos_captable_install_new_cap(obj, cap);
         }

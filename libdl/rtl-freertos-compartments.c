@@ -676,8 +676,8 @@ void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
       __CHERI_CAP_PERMISSION_PERMIT_LOAD__ | \
       __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__);
 
-  /* return a trampoline cap with an address of the first instruction */
-  return &tramp_cap_instance[3];
+  /* return a sentry trampoline cap with an address of the first instruction */
+  return cheri_sentry_create(&tramp_cap_instance[3]);
 }
 
 void rtl_cherifreertos_compartment_register_faultHandler(size_t compid, void* handler)
