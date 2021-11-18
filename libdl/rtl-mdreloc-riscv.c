@@ -110,7 +110,7 @@ rtems_rtl_hi20_find (intptr_t hi20_pc)
   {
     hi20_reloc_t* reloc = (hi20_reloc_t*) node;
 
-    if (reloc->hi20_pc == hi20_pc) {
+    if ((uint32_t) reloc->hi20_pc == (uint32_t) hi20_pc) {
       return reloc;
     }
 
