@@ -730,6 +730,9 @@ rtems_rtl_archive_loader (rtems_rtl_archive* archive, void* data)
 
 #if configCHERI_COMPARTMENTALIZATION_MODE == 2
   archive->captable = NULL;
+#if configCHERI_COMPARTMENTALIZATION_FAULT_RESTART
+  archive->captable_clone = NULL;
+#endif
   archive->comp_id  = rtl_cherifreertos_compartment_get_free_compid();
   // Allocate a new captable for this archive.
   if (!rtl_cherifreertos_captable_archive_alloc(archive, archive->symbols.entries + 1))

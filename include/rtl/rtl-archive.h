@@ -96,7 +96,10 @@ typedef struct rtems_rtl_archive
   size_t                    refs;     /**< Loaded object modules. */
   uint32_t                  flags;    /**< Some flags. */
 #if configCHERI_COMPARTMENTALIZATION_MODE == 2
-  void**                   captable;           /* Capability table per library */
+  void**                   captable;  /* Capability table per library */
+  #if configCHERI_COMPARTMENTALIZATION_FAULT_RESTART
+    void**                 captable_clone;     /* Capability table per library */
+  #endif
   size_t                   captable_free_slot; /* The next free slot in cap table */
   size_t                   caps_count;         /* The number of capabilities */
   size_t                   comp_id;            /* ID of an archive compartment */

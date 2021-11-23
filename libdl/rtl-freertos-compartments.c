@@ -932,6 +932,28 @@ rtl_cherifreertos_compartment_faultHandler(size_t compid) {
   func = (PendedFunction_t) archive->faultHandler;
 #endif
 
+#if configCHERI_COMPARTMENTALIZATION_FAULT_RETURN
+
+#elif configCHERI_COMPARTMENTALIZATION_FAULT_KILL
+
+// Invalidate GP
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+  obj->captable = NULL;
+#else
+  archive->captable = NULL;
+#endif
+  comp_list[compid].captable = NULL;
+  return (bool) pxHigherPriorityTaskWoken;
+
+#elif configCHERI_COMPARTMENTALIZATION_FAULT_CUSTOM
+
+#elif configCHERI_COMPARTMENTALIZATION_FAULT_RESTART
+  if(!rtl_cherifreertos_compartment_rollback(compid))
+    printf("Failed to rollback compartment %zu\n", compid);
+
+  return (bool) pxHigherPriorityTaskWoken;
+#endif
+
   // Notify the daemon task to run the per-compartment fault handler in its context
   if (func)
     xTimerPendFunctionCallFromISR(func, NULL, compid, &pxHigherPriorityTaskWoken);
@@ -1105,21 +1127,215 @@ FreeRTOSCompartmentResources_t* pCompResTable = NULL;
   // TODO: Revoke other FreeRTOS resources as well
 }
 
-void rtl_cherifreertos_debug_print_compartments(void) {
+int rtl_cherifreertos_compartment_snapshot(size_t compid)
+{
+#if configCHERI_COMPARTMENTALIZATION_FAULT_RESTART
+  void** captable = rtl_cherifreertos_compartment_get_captable(compid);
+  void** captable_clone = NULL;
+  size_t captable_len = 0;
+  int allocated = 0;
+
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
+
+#if 0
+  captable_len = obj->caps_count * sizeof(void *);
+
+  captable_clone = obj->captable_clone != NULL? obj->captable_clone : (void **) rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, captable_len, true);
+  if (captable_clone == NULL)
+    return -1;
+  memcpy((char*) captable_clone, (char *) captable, captable_len);
+
+  obj->captable_clone = captable_clone;
+
+  if (obj->text_size) {
+    if (obj->text_clone == NULL) {
+      obj->text_clone = (void **) rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, obj->text_size, true);
+      if (obj->text_clone == NULL)
+        return -1;
+    }
+    memcpy(obj->text_clone, obj->text_base, obj->text_size);
+  }
+
+  if (obj->const_size) {
+    if (obj->const_clone == NULL) {
+      obj->const_clone = (void **) rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, obj->const_size, true);
+      if (obj->const_clone == NULL)
+        return -1;
+    }
+    memcpy(obj->const_clone, obj->const_base, obj->const_size);
+  }
+#endif
+
+  if (obj->data_size) {
+    if (obj->data_clone == NULL) {
+      obj->data_clone = (void **) rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, obj->data_size, true);
+      if (obj->data_clone == NULL)
+        return -1;
+    }
+    memcpy(obj->data_clone, obj->data_base, obj->data_size);
+  }
+
+  if (obj->bss_size) {
+    if (obj->bss_clone == NULL) {
+      obj->bss_clone = (void **) rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, obj->bss_size, true);
+      if (obj->bss_clone == NULL)
+        return -1;
+    }
+    memcpy(obj->bss_clone, obj->bss_base, obj->bss_size);
+  }
+
+  return 1;
+#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+  rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
+
+#if 0
+  captable_len = archive->caps_count * sizeof(void *);
+
+  captable_clone = archive->captable_clone != NULL? archive->captable_clone: (void **) rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, captable_len, true);
+  if (captable_clone == NULL)
+    return -1;
+  memcpy(captable_clone, captable, captable_len);
+
+  archive->captable_clone = captable_clone;
+#endif
+
+  /* Search all loaded objects and if they belong to that archive compartment, clone it.
+   * TODO: Enhancement: extract loaded object names per archive directly.
+   */
   List_t* objects = rtems_rtl_objects_unprotected();
   ListItem_t* node = listGET_HEAD_ENTRY (objects);
 
   while (listGET_END_MARKER (objects) != node)
   {
-    rtems_rtl_obj* obj = (rtems_rtl_obj* ) node;
-    void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
-    size_t xCompID = rtl_cherifreertos_compartment_get_compid(obj);
+    rtems_rtl_obj* obj = (rtems_rtl_obj*) node;
+    if ((obj->aname != NULL && strcmp (obj->aname, archive->name) == 0))
+    {
+#if 0
+      if (obj->text_size) {
+        if (obj->text_clone == NULL) {
+          obj->text_clone = (void **) rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, obj->text_size, true);
+          if (obj->text_clone == NULL)
+            return -1;
+        }
+        memcpy(obj->text_clone, obj->text_base, obj->text_size);
+      }
 
-    printf("rtl:debug: %s@0x%x\t", obj->oname, (unsigned int)(uintptr_t) obj->text_base);
-    printf("compid = #%3zu ", xCompID);
-    printf("captab = %16p\n", captable);
+      if (obj->const_size) {
+        if (obj->const_clone == NULL) {
+          obj->const_clone = (void **) rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, obj->const_size, true);
+          if (obj->const_clone == NULL)
+            return -1;
+        }
+        memcpy(obj->const_clone, obj->const_base, obj->const_size);
+      }
+#endif
 
+      if (obj->data_size) {
+        if (obj->data_clone == NULL) {
+          obj->data_clone = (void **) rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, obj->data_size, true);
+          if (obj->data_clone == NULL)
+            return -1;
+        }
+        memcpy(obj->data_clone, obj->data_base, obj->data_size);
+      }
+
+      if (obj->bss_size) {
+        if (obj->bss_clone == NULL) {
+          obj->bss_clone = (void **) rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, obj->bss_size, true);
+          if (obj->bss_clone == NULL)
+            return -1;
+        }
+        memcpy(obj->bss_clone, obj->bss_base, obj->bss_size);
+      }
+
+    }
     node = listGET_NEXT (node);
   }
+
+  return 1;
+#endif
+#endif
+}
+
+int rtl_cherifreertos_compartment_rollback(size_t compid)
+{
+#if configCHERI_COMPARTMENTALIZATION_FAULT_RESTART
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
+  size_t captable_len = cheri_length_get(obj->captable_clone);
+
+  if (obj->captable_clone == NULL)
+    return -1;
+  memcpy(obj->captable, obj->captable_clone, captable_len);
+
+  if (obj->text_clone == NULL && obj->text_size != 0)
+    return -1;
+  memcpy(obj->text_base, obj->text_clone, obj->text_size);
+
+  if (obj->data_clone == NULL && obj->data_size != 0)
+    return -1;
+  memcpy(obj->data_base, obj->data_clone, obj->data_size);
+
+  if (obj->const_clone == NULL && obj->const_size != 0)
+    return -1;
+  memcpy(obj->const_base, obj->const_clone, obj->const_size);
+
+  if (obj->bss_clone == NULL && obj->bss_size != 0)
+    return -1;
+  memcpy(obj->bss_base, obj->bss_clone, obj->bss_size);
+
+  return 1;
+#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+  rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
+  size_t captable_len = archive->caps_count * sizeof(void *);
+
+  if (archive->captable_clone == NULL && archive->caps_count != 0)
+    return -1;
+  memcpy(archive->captable, archive->captable_clone, captable_len);
+
+  /* Search all loaded objects and if they belong to that archive compartment, clone it.
+   * TODO: Enhancement: extract loaded object names per archive directly.
+   */
+  List_t* objects = rtems_rtl_objects_unprotected();
+  ListItem_t* node = listGET_HEAD_ENTRY (objects);
+
+  while (listGET_END_MARKER (objects) != node)
+  {
+    rtems_rtl_obj* obj = (rtems_rtl_obj*) node;
+    if ((obj->aname != NULL && strcmp (obj->aname, archive->name) == 0))
+    {
+      if (obj->text_clone == NULL && obj->text_size != 0)
+        return -1;
+      memcpy(obj->text_base, obj->text_clone, obj->text_size);
+
+      if (obj->data_clone == NULL && obj->data_size != 0)
+        return -1;
+      memcpy(obj->data_base, obj->data_clone, obj->data_size);
+
+      if (obj->const_clone == NULL && obj->const_size != 0)
+        return -1;
+      memcpy(obj->const_base, obj->const_clone, obj->const_size);
+
+      if (obj->bss_clone == NULL && obj->bss_size != 0)
+        return -1;
+      memcpy(obj->bss_base, obj->bss_clone, obj->bss_size);
+    }
+    node = listGET_NEXT (node);
+  }
+
+  return 1;
+#endif
+#endif
+}
+
+int rtl_cherifreertos_compartments_snapshot(void)
+{
+#if configCHERI_COMPARTMENTALIZATION_FAULT_RESTART
+  for (int i=0; i < comp_id_free; i++)
+    if (!rtl_cherifreertos_compartment_snapshot(i))
+      return -1;
+#endif
+  return 1;
 }
 #endif

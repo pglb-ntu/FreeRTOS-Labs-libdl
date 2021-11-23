@@ -74,6 +74,12 @@ dlopen (const char* name, int mode)
     _rtld_debug_state ();
   #endif
 
+  #if configCHERI_COMPARTMENTALIZATION
+    if (!rtl_cherifreertos_compartments_snapshot()) {
+      printf("Failed to snapshot the compartmentalized system\n");
+      return NULL;
+    }
+  #endif
   #if configCHERI_COMPARTMENTALIZATION || configMPU_COMPARTMENTALIZATION
     rtl_cherifreertos_debug_print_compartments();
   #endif

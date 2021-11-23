@@ -233,6 +233,18 @@ struct rtems_rtl_obj
   size_t              bss_size;     /**< The size of the bss section. */
   size_t              exec_size;    /**< The amount of executable memory
                                      *   allocated */
+#if configCHERI_COMPARTMENTALIZATION && configCHERI_COMPARTMENTALIZATION_FAULT_RESTART
+  void**              captable_clone;/* Capability table per object */
+  void*               text_clone;    /**< The base address of the text section
+                                     *   in memory. */
+  void*               const_clone;   /**< The base address of the const section
+                                     *   in memory. */
+  void*               data_clone;    /**< The base address of the data section
+                                     *   in memory. */
+  void*               bss_clone;     /**< The base address of the bss section in
+                                     *   memory. */
+#endif
+
   void*               entry;        /**< The entry point of the module. */
   uint32_t            checksum;     /**< The checksum of the text sections. A
                                      *   zero means do not checksum. */

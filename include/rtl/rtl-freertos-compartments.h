@@ -256,5 +256,10 @@ rtl_cherifreertos_compartment_backtrace(void* pc, void* sp, void* ra, size_t xCo
  */
 bool
 rtl_cherifreertos_is_inter_compartment(rtems_rtl_obj* obj, const char* symaname);
+
+int rtl_cherifreertos_compartment_snapshot(size_t compid);
+int rtl_cherifreertos_compartment_rollback(size_t compid);
+int rtl_cherifreertos_compartments_snapshot(void);
+
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
