@@ -32,17 +32,241 @@
 #include <cheri/cheri-utility.h>
 extern void *pvAlmightyDataCap;
 extern void *pvAlmightyCodeCap;
-
-#if 0
-extern Elf_Sym*  __symtab_start;
-extern Elf_Sym*  __symtab_end;
-extern char*  __strtab_start;
-extern char*  __strtab_end;
 #endif
 
+#if (configCHERI_COMPARTMENTALIZATION || configMPU_COMPARTMENTALIZATION)
 Compartment_t comp_list[configCOMPARTMENTS_NUM];
 static size_t comp_id_free = 0;
-#endif /* configCHERI_COMPARTMENTALIZATION */
+
+size_t rtl_cherifreertos_compartment_get_free_compid(void) {
+
+  if (comp_id_free >= configCOMPARTMENTS_NUM) {
+    printf("Too many compartments, only %d are supported\n", configCOMPARTMENTS_NUM);
+  }
+
+  return comp_id_free++;
+}
+
+size_t
+rtl_cherifreertos_compartment_get_regions_count(rtems_rtl_obj* obj) {
+#if (configMPU_COMPARTMENTALIZATION == 1 || configCHERI_COMPARTMENTALIZATION == 1)
+  return obj->global_syms + obj->local_syms;
+#elif (configMPU_COMPARTMENTALIZATION == 2 || configCHERI_COMPARTMENTALIZATION == 2)
+  return archive->symbols.entries;
+#endif
+  return 0;
+}
+
+void rtl_cherifreertos_debug_print_compartments(void) {
+  List_t* objects = rtems_rtl_objects_unprotected();
+  ListItem_t* node = listGET_HEAD_ENTRY (objects);
+
+  while (listGET_END_MARKER (objects) != node)
+  {
+    rtems_rtl_obj* obj = (rtems_rtl_obj* ) node;
+    void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
+    size_t xCompID = rtl_cherifreertos_compartment_get_compid(obj);
+
+    printf("rtl:debug: %32s@0x%x\t", obj->oname, (unsigned int)(uintptr_t) obj->text_base);
+    printf("compid = #%3zu ", xCompID);
+    printf("captab = %16p\t", captable);
+    printf("regions = %16zu \n", rtl_cherifreertos_compartment_get_regions_count(obj));
+
+    node = listGET_NEXT (node);
+  }
+
+  printf("RTL: FreeRTOS Malloc Free: %zu\n", xPortGetFreeHeapSize());
+  printf("RTL: RTL Malloc Free: %zu\n", xRTLtGetFreeHeapSize());
+  printf("RTL: Number of compartments = %zu\n", comp_id_free);
+}
+
+bool
+rtl_cherifreertos_is_inter_compartment(rtems_rtl_obj* obj, const char* symname) {
+  bool isInterCompartment = true;
+  // If it is in the same object or in the kernel's globals it is intra-compartment
+  if (rtems_rtl_gsymbol_obj_find(obj, symname) ||
+      rtems_rtl_lsymbol_obj_find(obj, symname) ||
+      rtems_rtl_symbol_global_find(symname))
+    isInterCompartment = false;
+
+#if (configCHERI_COMPARTMENTALIZATION == 2 || configMPU_COMPARTMENTALIZATION_MODE == 2)
+  /* Search for a per-archive fault handler */
+  rtems_rtl_archive_obj_data search = {
+    .symbol  = symname,
+    .archive = obj->archive,
+    .offset  = 0
+  };
+
+  rtems_rtl_archive_obj_finder(obj->archive, &search);
+
+  // Found an object in the library compartment that has the symbol
+  if (search.offset)
+    isInterCompartment = false;
+#endif
+
+  return isInterCompartment;
+}
+
+#endif /* configCHERI_COMPARTMENTALIZATION || configMPU_COMPARTMENTALIZATION */
+
+#if configMPU_COMPARTMENTALIZATION
+size_t
+rtl_cherifreertos_compartment_get_compid(rtems_rtl_obj* obj) {
+#if configMPU_COMPARTMENTALIZATION_MODE == 1
+  return obj->comp_id;
+#elif configMPU_COMPARTMENTALIZATION_MODE == 2
+  return obj->archive->comp_id;
+#endif
+}
+
+#if configMPU_COMPARTMENTALIZATION_MODE == 1
+bool
+rtl_cherifreertos_compartment_set_obj(rtems_rtl_obj* obj) {
+
+  if (!obj) {
+    rtems_rtl_set_error (EINVAL, "Invalid object to set for a compartment");
+    return false;
+  }
+
+  if (obj->comp_id >= configCOMPARTMENTS_NUM)
+    return false;
+
+  comp_list[obj->comp_id].obj = obj;
+
+  return true;
+}
+
+rtems_rtl_obj *
+rtl_cherifreertos_compartment_get_obj(size_t comp_id) {
+
+  if (comp_id >= configCOMPARTMENTS_NUM)
+    return NULL;
+
+  return (rtems_rtl_obj *) comp_list[comp_id].obj;
+}
+#endif
+
+#if configMPU_COMPARTMENTALIZATION == 2
+bool
+rtl_cherifreertos_compartment_set_archive(rtems_rtl_archive* archive) {
+  if (!archive) {
+    rtems_rtl_set_error (EINVAL, "Invalid archive to set for a compartment");
+    return false;
+  }
+
+  if (archive->comp_id >= configCOMPARTMENTS_NUM)
+    return false;
+
+  comp_list[archive->comp_id].archive = archive;
+  return true;
+}
+
+rtems_rtl_archive*
+rtl_cherifreertos_compartment_get_archive(size_t comp_id) {
+
+  if (comp_id >= configCOMPARTMENTS_NUM)
+    return NULL;
+
+  return (rtems_rtl_archive *) comp_list[comp_id].archive;
+}
+#endif
+
+void **
+rtl_cherifreertos_compartment_obj_get_captable(rtems_rtl_obj* obj) {
+#if configMPU_COMPARTMENTALIZATION_MODE == 1
+  return &obj->captable;
+#elif configMPU_COMPARTMENTALIZATION_MODE == 2
+  return &obj->archive->captable;
+#endif
+}
+
+void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
+{
+  rtems_rtl_obj* kernel_obj = rtems_rtl_baseimage();
+  rtems_rtl_obj_sym* tramp_sym;
+  rtems_rtl_obj_sym* comp_switch_sym;
+  void* tramp_template;
+  volatile size_t* tramp_instance;
+  volatile void* global_comp_switch;
+  void **captable = NULL;
+
+#if configMPU_COMPARTMENTALIZATION_MODE == 1
+  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
+
+  if (obj == NULL) {
+    printf("Couldn't find an object for compid %zu\n", compid);
+    return NULL;
+  }
+
+  captable = &obj->captable;
+#elif configMPU_COMPARTMENTALIZATION_MODE == 2
+  rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
+
+  if (archive == NULL) {
+    printf("Couldn't find an archive for compid %zu\n", compid);
+    return NULL;
+  }
+
+  captable = &obj->archive->captable;
+#endif
+
+  /* Find the xPortCompartmentTrampSetup template to copy from. This contains metadata such as
+   * function, captable, trampoline func, etc required for further compartment switch */
+  tramp_sym = rtems_rtl_symbol_global_find ("xPortCompartmentTrampSetup");
+  if (tramp_sym == NULL) {
+    printf("Failed to find xPortCompartmentTrampSetup needed for inter-compartment calls\n");
+    return NULL;
+  }
+
+  /* Install the default compartment switch. TODO This might be custom for compartment-matrices with
+   * refined compartment policies that differ between different inter-compartment calls
+   */
+  comp_switch_sym = rtems_rtl_symbol_global_find ("xPortCompartmentEnterTrampoline");
+  if (comp_switch_sym == NULL) {
+    printf("Failed to find xPortCompartmentEnterTrampoline needed for inter-compartment calls\n");
+    return NULL;
+  }
+
+  // Setup trampoline function and metadata
+  tramp_template = tramp_sym->value;
+
+  // Get a capability to the global default compartment switch function
+  global_comp_switch = comp_switch_sym->value;
+
+  /* Allocate memory for the new setup trampoline */
+  tramp_instance = rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_READ_EXEC, tramp_sym->size, true);
+  if (tramp_instance == NULL) {
+    printf("Failed to allocate a new trampoline to do external calls\n");
+    return NULL;
+  }
+
+  /* Copy template trampoline into the newly allocated area of memory */
+  memcpy((void *) tramp_instance, (void *) tramp_template, tramp_sym->size);
+
+  /* Setup code cap in the trampoline */
+  tramp_instance[0] = code;
+
+  /* Setup captable in the trampoline */
+  tramp_instance[1] = captable;
+
+  /* Setup default compartment switch function */
+  tramp_instance[2] = global_comp_switch;
+
+  /* Set num or regions */
+  tramp_instance[3] = (size_t) rtl_cherifreertos_compartment_get_regions_count(obj);
+
+  /* Setup the new compartment ID in the trampoline */
+  if (compid >= configCOMPARTMENTS_NUM) {
+    return NULL;
+  }
+
+  /* Setup compartment ID by fixing up ADDI immediate */
+  uint32_t* addi_inst = (uint32_t*) &tramp_instance[4];
+  *addi_inst = ((*addi_inst) & 0x000fffff) | (compid << 20);
+
+  return &tramp_instance[4];
+}
+#endif
 
 #if configCHERI_COMPARTMENTALIZATION
 void
@@ -205,15 +429,6 @@ rtl_freertos_global_symbols_add(rtems_rtl_obj* obj) {
   return globals_count;
 }
 #endif
-
-size_t rtl_cherifreertos_compartment_get_free_compid(void) {
-
-  if (comp_id_free >= configCOMPARTMENTS_NUM) {
-    printf("Too many compartments, only %d are supported\n", configCOMPARTMENTS_NUM);
-  }
-
-  return comp_id_free++;
-}
 
 bool
 rtl_cherifreertos_compartment_captable_set_perms (size_t xCompID)
@@ -579,32 +794,6 @@ rtl_cherifreertos_captable_install_new_cap(rtems_rtl_obj* obj, void* new_cap) {
 #endif
 
   return free_slot;
-}
-
-bool
-rtl_cherifreertos_is_inter_compartment(rtems_rtl_obj* obj, const char* symname) {
-  bool isInterCompartment = true;
-  // If it is in the same object or in the kernel's globals it is intra-compartment
-  if (rtems_rtl_gsymbol_obj_find(obj, symname) ||
-      rtems_rtl_lsymbol_obj_find(obj, symname) ||
-      rtems_rtl_symbol_global_find(symname))
-    isInterCompartment = false;
-#if configCHERI_COMPARTMENTALIZATION_MODE == 2
-  /* Search for a per-archive fault handler */
-  rtems_rtl_archive_obj_data search = {
-    .symbol  = symname,
-    .archive = obj->archive,
-    .offset  = 0
-  };
-
-  rtems_rtl_archive_obj_finder(obj->archive, &search);
-
-  // Found an object in the library compartment that has the symbol
-  if (search.offset)
-    isInterCompartment = false;
-#endif
-
-  return isInterCompartment;
 }
 
 void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)

@@ -252,6 +252,12 @@ rtems_rtl_data_init (void)
 #endif
 #endif
 
+#if configMPU_COMPARTMENTALIZATION_MODE == 1
+      rtl->base->comp_id = configCOMPARTMENTS_NUM - 1;
+#elif configMPU_COMPARTMENTALIZATION_MODE == 2
+      rtl->base->archive->comp_id = configCOMPARTMENTS_NUM - 1;
+#endif
+
       /*
        * Lock the base image and flag it as the base image.
        */

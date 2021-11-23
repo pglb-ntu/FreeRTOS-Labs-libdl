@@ -259,6 +259,11 @@ struct rtems_rtl_obj
   size_t              comp_id;            /* ID of an object compartment */
   bool                (*faultHandler)(void* , uint32_t); /* Compartment fault handler */
   void*               pCompResTable; /* Per Compartment FreeRTOS resource table */
+#elif configMPU_COMPARTMENTALIZATION == 1
+  size_t              captable[configMPU_REGIONS_NUM][3]; /* MPU region table per object */
+  size_t              comp_id;                            /* ID of an object compartment */
+  bool                (*faultHandler)(void* , uint32_t);  /* Compartment fault handler */
+  void*               pCompResTable;                      /* Per Compartment FreeRTOS resource table */
 #endif
 };
 

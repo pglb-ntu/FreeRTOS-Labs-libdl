@@ -723,6 +723,11 @@ rtems_rtl_archive_loader (rtems_rtl_archive* archive, void* data)
 
     archive->flags &= ~RTEMS_RTL_ARCHIVE_LOAD;
 
+#if configMPU_COMPARTMENTALIZATION_MODE == 2
+  archive->comp_id  = rtl_cherifreertos_compartment_get_free_compid();
+  rtl_cherifreertos_compartment_set_archive(archive);
+#endif
+
 #if configCHERI_COMPARTMENTALIZATION_MODE == 2
   archive->captable = NULL;
   archive->comp_id  = rtl_cherifreertos_compartment_get_free_compid();

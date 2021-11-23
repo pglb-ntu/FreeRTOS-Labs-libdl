@@ -8,9 +8,9 @@
 
 typedef struct compartment {
   void**      captable;
-#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+#if ((configCHERI_COMPARTMENTALIZATION_MODE == 1) || (configMPU_COMPARTMENTALIZATION_MODE == 1))
   void*       obj;
-#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
+#elif ((configCHERI_COMPARTMENTALIZATION_MODE == 2) || (configMPU_COMPARTMENTALIZATION_MODE == 2))
   void*       archive;
 #endif /* configCHERI_COMPARTMENTALIZATION_MODE */
   uint64_t    id;
@@ -188,6 +188,12 @@ rtl_cherifreertos_compartment_get_compid(rtems_rtl_obj* obj);
  */
 void **
 rtl_cherifreertos_compartment_obj_get_captable(rtems_rtl_obj* obj);
+
+/**
+ * Get the number of regions/symbols each compartment protects.
+ */
+size_t
+rtl_cherifreertos_compartment_get_regions_count(rtems_rtl_obj* obj);
 
 #if __CHERI_PURE_CAPABILITY__
 /**

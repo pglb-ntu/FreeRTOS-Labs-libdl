@@ -569,6 +569,23 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
 
   case R_TYPE(CALL_PLT):
   case R_TYPE(CALL): {
+#if configCHERI_COMPARTMENTALIZATION
+  if (rtl_cherifreertos_is_inter_compartment(obj, symname) && rtems_rtl_esymbol_obj_find(obj, symname)) {
+
+    // Find the owner compartment of this symbol
+    rtems_rtl_obj* owner_obj = rtems_rtl_find_obj_with_symbol(symname);
+    if (owner_obj == NULL) {
+      return rtems_rtl_elf_rel_failure;
+    }
+
+    void* tramp_cap = rtl_cherifreertos_compartments_setup_ecall((void*) symvalue, rtl_cherifreertos_compartment_get_compid(owner_obj));
+    if (tramp_cap == NULL) {
+      return rtems_rtl_elf_rel_failure;
+    } else {
+      pcrel_val = (intptr_t) tramp_cap - ((intptr_t) where);
+    }
+  }
+#endif
     int64_t hi = SignExtend64(pcrel_val + 0x800, bits);
     write32le(where, (read32le(where) & 0xFFF) | (hi & 0xFFFFF000));
     int64_t hi20 = SignExtend64(pcrel_val + 0x800, bits);

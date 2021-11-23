@@ -1875,6 +1875,11 @@ rtems_rtl_elf_file_load (rtems_rtl_obj* obj, int fd)
   if (!rtems_rtl_obj_load_symbols (obj, fd, rtems_rtl_elf_symbols_load, &ehdr))
     return false;
 
+#if configMPU_COMPARTMENTALIZATION_MODE == 1
+  obj->comp_id  = rtl_cherifreertos_compartment_get_free_compid();
+  rtl_cherifreertos_compartment_set_obj(obj);
+#endif
+
 #if configCHERI_COMPARTMENTALIZATION
 #if configCHERI_COMPARTMENTALIZATION_MODE == 1
   obj->captable = NULL;
