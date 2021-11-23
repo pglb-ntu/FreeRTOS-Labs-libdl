@@ -50,6 +50,12 @@ size_t rtl_cherifreertos_compartment_get_free_compid(void) {
 
 size_t
 rtl_cherifreertos_compartment_get_regions_count(size_t compid) {
+
+  // FreeRTOS kernel compartment
+  if (compid == configCOMPARTMENTS_NUM - 1) {
+    return rtems_rtl_baseimage()->global_syms;
+  }
+
 #if (configMPU_COMPARTMENTALIZATION_MODE == 1 || configCHERI_COMPARTMENTALIZATION_MODE == 1)
   rtems_rtl_obj* obj = comp_list[compid].obj;
   return obj->global_syms + obj->local_syms;
