@@ -26,6 +26,7 @@
 #endif
 
 #include <sys/exec_elf.h>
+#include "rtl-alloc-heap.h"
 
 #if configCHERI_COMPARTMENTALIZATION
 #include <cheriintrin.h>

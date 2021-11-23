@@ -22,6 +22,8 @@
 
 #include <FreeRTOSConfig.h>
 
+#include "rtl-alloc-heap.h"
+
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <rtl/rtl-freertos-compartments.h>
 #include <cheri/cheri-utility.h>
@@ -52,6 +54,9 @@ void*
 dlopen (const char* name, int mode)
 {
   rtems_rtl_obj* obj = NULL;
+
+  printf("RTL: FreeRTOS Malloc Free: %zu\n", xPortGetFreeHeapSize());
+  printf("RTL: RTL Malloc Free: %zu\n", xRTLtGetFreeHeapSize());
 
   if (!rtems_rtl_lock ())
     return NULL;

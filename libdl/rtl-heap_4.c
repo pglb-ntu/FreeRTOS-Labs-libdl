@@ -340,7 +340,7 @@ void vRTLFree( void * pv )
 }
 /*-----------------------------------------------------------*/
 
-static size_t xRTLtGetFreeHeapSize( void )
+size_t xRTLtGetFreeHeapSize( void )
 {
     return xFreeBytesRemaining;
 }

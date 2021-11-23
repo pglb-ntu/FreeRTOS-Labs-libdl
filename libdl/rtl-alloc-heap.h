@@ -24,6 +24,7 @@ extern "C" {
 
 void * pvRTLMalloc( size_t xWantedSize );
 void vRTLFree( void * pv );
+size_t xRTLtGetFreeHeapSize();
 
 /**
  * Allocator handler for the standard libc heap.
