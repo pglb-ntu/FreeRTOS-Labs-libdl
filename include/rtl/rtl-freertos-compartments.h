@@ -193,7 +193,7 @@ rtl_cherifreertos_compartment_obj_get_captable(rtems_rtl_obj* obj);
  * Get the number of regions/symbols each compartment protects.
  */
 size_t
-rtl_cherifreertos_compartment_get_regions_count(rtems_rtl_obj* obj);
+rtl_cherifreertos_compartment_get_regions_count(size_t compid);
 
 #if __CHERI_PURE_CAPABILITY__
 /**

@@ -49,10 +49,12 @@ size_t rtl_cherifreertos_compartment_get_free_compid(void) {
 }
 
 size_t
-rtl_cherifreertos_compartment_get_regions_count(rtems_rtl_obj* obj) {
-#if (configMPU_COMPARTMENTALIZATION == 1 || configCHERI_COMPARTMENTALIZATION == 1)
+rtl_cherifreertos_compartment_get_regions_count(size_t compid) {
+#if (configMPU_COMPARTMENTALIZATION_MODE == 1 || configCHERI_COMPARTMENTALIZATION_MODE == 1)
+  rtems_rtl_obj* obj = comp_list[compid].obj;
   return obj->global_syms + obj->local_syms;
-#elif (configMPU_COMPARTMENTALIZATION == 2 || configCHERI_COMPARTMENTALIZATION == 2)
+#elif (configMPU_COMPARTMENTALIZATION_MODE == 2 || configCHERI_COMPARTMENTALIZATION_MODE == 2)
+  rtems_rtl_archive* archive = comp_list[compid].archive;
   return archive->symbols.entries;
 #endif
   return 0;
@@ -71,7 +73,7 @@ void rtl_cherifreertos_debug_print_compartments(void) {
     printf("rtl:debug: %32s@0x%x\t", obj->oname, (unsigned int)(uintptr_t) obj->text_base);
     printf("compid = #%3zu ", xCompID);
     printf("captab = %16p\t", captable);
-    printf("regions = %16zu \n", rtl_cherifreertos_compartment_get_regions_count(obj));
+    printf("regions = %16zu \n", rtl_cherifreertos_compartment_get_regions_count(xCompID));
 
     node = listGET_NEXT (node);
   }
@@ -90,7 +92,7 @@ rtl_cherifreertos_is_inter_compartment(rtems_rtl_obj* obj, const char* symname) 
       rtems_rtl_symbol_global_find(symname))
     isInterCompartment = false;
 
-#if (configCHERI_COMPARTMENTALIZATION == 2 || configMPU_COMPARTMENTALIZATION_MODE == 2)
+#if (configCHERI_COMPARTMENTALIZATION_MODE == 2 || configMPU_COMPARTMENTALIZATION_MODE == 2)
   /* Search for a per-archive fault handler */
   rtems_rtl_archive_obj_data search = {
     .symbol  = symname,
@@ -147,7 +149,7 @@ rtl_cherifreertos_compartment_get_obj(size_t comp_id) {
 }
 #endif
 
-#if configMPU_COMPARTMENTALIZATION == 2
+#if configMPU_COMPARTMENTALIZATION_MODE == 2
 bool
 rtl_cherifreertos_compartment_set_archive(rtems_rtl_archive* archive) {
   if (!archive) {
@@ -189,27 +191,7 @@ void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
   void* tramp_template;
   volatile size_t* tramp_instance;
   volatile void* global_comp_switch;
-  void **captable = NULL;
-
-#if configMPU_COMPARTMENTALIZATION_MODE == 1
-  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
-
-  if (obj == NULL) {
-    printf("Couldn't find an object for compid %zu\n", compid);
-    return NULL;
-  }
-
-  captable = &obj->captable;
-#elif configMPU_COMPARTMENTALIZATION_MODE == 2
-  rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
-
-  if (archive == NULL) {
-    printf("Couldn't find an archive for compid %zu\n", compid);
-    return NULL;
-  }
-
-  captable = &obj->archive->captable;
-#endif
+  void **captable = &comp_list[compid].captable;
 
   /* Find the xPortCompartmentTrampSetup template to copy from. This contains metadata such as
    * function, captable, trampoline func, etc required for further compartment switch */
@@ -254,7 +236,7 @@ void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
   tramp_instance[2] = global_comp_switch;
 
   /* Set num or regions */
-  tramp_instance[3] = (size_t) rtl_cherifreertos_compartment_get_regions_count(obj);
+  tramp_instance[3] = rtl_cherifreertos_compartment_get_regions_count(compid);
 
   /* Setup the new compartment ID in the trampoline */
   if (compid >= configCOMPARTMENTS_NUM) {
