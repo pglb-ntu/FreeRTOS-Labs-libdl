@@ -569,7 +569,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
 
   case R_TYPE(CALL_PLT):
   case R_TYPE(CALL): {
-#if configCHERI_COMPARTMENTALIZATION
+#if configMPU_COMPARTMENTALIZATION
   if (rtl_cherifreertos_is_inter_compartment(obj, symname) && rtems_rtl_esymbol_obj_find(obj, symname)) {
 
     // Find the owner compartment of this symbol
