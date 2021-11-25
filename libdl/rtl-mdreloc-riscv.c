@@ -311,7 +311,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
                           const rtems_rtl_obj_sect* sect,
                           const char*               symname,
                           const Elf_Word            syminfo,
-                          const Elf_Word            symvalue,
+                          Elf_Word                  symvalue,
                           Elf_Word                  type,
                           const bool parsing) {
   Elf_Word *where;
@@ -515,6 +515,35 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
   break;
 
   case R_TYPE(PCREL_HI20): {
+
+#if configMPU_COMPARTMENTALIZATION
+    rtems_rtl_obj_sym* rtl_sym = rtems_rtl_symbol_obj_find(obj, symname);
+    if (rtl_sym) {
+
+      if (ELF_ST_TYPE(rtl_sym->data >> 16) == STT_FUNC) {
+        // Find the owner compartment of this symbol
+        rtems_rtl_obj* owner_obj = rtems_rtl_find_obj_with_symbol(symname);
+        if (owner_obj == NULL) {
+          // It is a local static function
+          owner_obj = obj;
+        }
+
+        // Get the symbol/capability from the owner's obj/captable
+        rtl_sym = rtems_rtl_symbol_obj_find(owner_obj, symname);
+        if (rtl_sym == NULL) {
+          return rtems_rtl_elf_rel_failure;
+        }
+
+        void* tramp_cap = rtl_cherifreertos_compartments_setup_ecall((void*) symvalue, rtl_cherifreertos_compartment_get_compid(owner_obj));
+        if (tramp_cap == NULL) {
+          return rtems_rtl_elf_rel_failure;
+        } else {
+          symvalue = (size_t) tramp_cap;
+        }
+    }
+  }
+#endif
+
     int64_t hi = SignExtend64(pcrel_val + 0x800, bits); //pcrel_val + 0x800;
     write32le(where, (read32le(where) & 0xFFF) | (hi & 0xFFFFF000));
 
