@@ -64,6 +64,7 @@
 typedef struct rela_hi20 {
   ListItem_t  node;
   Elf_Word    symvalue;
+  Elf_Word    hi20_tramp;
   intptr_t    hi20_pc;
 } hi20_reloc_t;
 
@@ -115,6 +116,36 @@ rtems_rtl_hi20_find (intptr_t hi20_pc)
     }
 
     node = listGET_NEXT (node);
+  }
+
+  return NULL;
+}
+
+static hi20_reloc_t*
+rtems_rtl_hi20_find_symvalue (Elf_Word symvalue)
+{
+  hi20_relocs_t*       relocs;
+  List_t*              bucket;
+  ListItem_t*          node;
+
+  relocs = &hi20_relocs_table;
+  size_t nbuckets = hi20_relocs_table.nbuckets;
+
+
+  for (int i = 0; i < nbuckets; i ++) {
+    bucket = &relocs->buckets[i];
+    node = listGET_HEAD_ENTRY (bucket);
+
+    while (listGET_END_MARKER (bucket) != node)
+    {
+      hi20_reloc_t* reloc = (hi20_reloc_t*) node;
+
+      if ((uint32_t) reloc->symvalue == (uint32_t) symvalue) {
+        return reloc;
+      }
+
+      node = listGET_NEXT (node);
+    }
   }
 
   return NULL;
@@ -561,12 +592,67 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
   case R_TYPE(GOT_HI20):
   case R_TYPE(HI20): {
 
+#if configMPU_COMPARTMENTALIZATION
+    rtems_rtl_obj_sym* rtl_sym = rtems_rtl_symbol_obj_find(obj, symname);
+    if (rtl_sym) {
+
+      if (ELF_ST_TYPE(rtl_sym->data >> 16) == STT_FUNC) {
+        // Find the owner compartment of this symbol
+        rtems_rtl_obj* owner_obj = rtems_rtl_find_obj_with_symbol(symname);
+        if (owner_obj == NULL) {
+          // It is a local static function
+          owner_obj = obj;
+        }
+
+        // Get the symbol/capability from the owner's obj/captable
+        rtl_sym = rtems_rtl_symbol_obj_find(owner_obj, symname);
+        if (rtl_sym == NULL) {
+          return rtems_rtl_elf_rel_failure;
+        }
+
+        void* tramp_cap = rtl_cherifreertos_compartments_setup_ecall((void*) symvalue, rtl_cherifreertos_compartment_get_compid(owner_obj));
+        if (tramp_cap == NULL) {
+          return rtems_rtl_elf_rel_failure;
+        } else {
+          // printf("Detected a function pointer %s\n", symname);
+          hi20_reloc_t *hi20_reloc =  rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_OBJECT, sizeof(hi20_reloc_t), true);
+          vListInitialiseItem(&hi20_reloc->node);
+
+          hi20_reloc->symvalue = symvalue;
+          hi20_reloc->hi20_tramp = tramp_cap;
+          hi20_reloc->hi20_pc = (intptr_t) where;
+
+          rtems_rtl_hi20_insert(&hi20_relocs_table, hi20_reloc);
+
+          symvalue = (size_t) tramp_cap;
+        }
+    }
+  }
+#endif
+
     uint64_t hi = symvalue + 0x800;
     write32le(where, (read32le(where) & 0xFFF) | (hi & 0xFFFFF000));
   }
   break;
 
   case R_TYPE(LO12_I): {
+
+#if configMPU_COMPARTMENTALIZATION
+    rtems_rtl_obj_sym* rtl_sym = rtems_rtl_symbol_obj_find(obj, symname);
+    if (rtl_sym) {
+
+      if (ELF_ST_TYPE(rtl_sym->data >> 16) == STT_FUNC) {
+        hi20_reloc_t *ret_reloc = rtems_rtl_hi20_find_symvalue(symvalue);
+        if (ret_reloc) {
+          //printf("LO12_I function pointer detected %s \n", symname);
+          symvalue = ret_reloc->hi20_tramp;
+        } else {
+          //printf("Failed LO12_I function pointer detected %s\n", symname);
+          return rtems_rtl_elf_rel_failure;
+        }
+      }
+   }
+#endif
 
     uint64_t hi = (symvalue + 0x800) >> 12;
     uint64_t lo = symvalue - (hi << 12);
@@ -576,6 +662,21 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
   break;
 
   case R_TYPE(LO12_S): {
+#if configMPU_COMPARTMENTALIZATION
+    rtems_rtl_obj_sym* rtl_sym = rtems_rtl_symbol_obj_find(obj, symname);
+    if (rtl_sym) {
+      if (ELF_ST_TYPE(rtl_sym->data >> 16) == STT_FUNC) {
+        hi20_reloc_t *ret_reloc = rtems_rtl_hi20_find_symvalue(symvalue);
+        if (ret_reloc) {
+          //printf("LO12_S function pointer detected %s\n", symname);
+          symvalue = ret_reloc->hi20_tramp;
+        } else {
+          //printf("Failed LO12_S function pointer detected %s \n", symname);
+          return rtems_rtl_elf_rel_failure;
+        }
+      }
+   }
+#endif
     uint64_t hi = (symvalue + 0x800) >> 12;
     uint64_t lo = symvalue - (hi << 12);
     uint32_t imm11_5 = extractBits(lo, 11, 5) << 25;
