@@ -711,7 +711,7 @@ rtems_rtl_unresolved_resolve (void)
     resolving = ard.result == rtems_rtl_archive_search_loaded;
   }
 
-  if (rtems_rtl_trace (RTEMS_RTL_TRACE_UNRESOLVED))
+  //if (rtems_rtl_trace (RTEMS_RTL_TRACE_UNRESOLVED))
     rtems_rtl_unresolved_dump ();
 }
 
