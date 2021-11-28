@@ -352,6 +352,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
 
   char bits = (sizeof(Elf_Word) * 8);
   where = (Elf_Word *)(sect->base + rela->r_offset);
+  symvalue += addend;
 
   // Final PCREL value
   Elf_Word pcrel_val = symvalue - ((intptr_t) where);
