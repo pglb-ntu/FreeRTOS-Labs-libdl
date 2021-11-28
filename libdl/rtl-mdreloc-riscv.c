@@ -571,6 +571,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
           return rtems_rtl_elf_rel_failure;
         } else {
           symvalue = (size_t) tramp_cap;
+          pcrel_val = (intptr_t) tramp_cap - ((intptr_t) where);
         }
     }
   }
