@@ -168,6 +168,19 @@ dlsym (void* handle, const char *symbol)
     }
 #endif
 
+#if configMPU_COMPARTMENTALIZATION
+    void* tramp_cap;
+    void** captable = rtl_cherifreertos_compartment_obj_get_captable(obj);
+    /* Setup a compartment switch trampoline if it is a function */
+    if (ELF_ST_TYPE(sym->data >> 16) == STT_FUNC) {
+      tramp_cap = rtl_cherifreertos_compartments_setup_ecall((void*) symval, rtl_cherifreertos_compartment_get_compid(obj));
+      if (tramp_cap == NULL)
+        return NULL;
+      else
+        symval = (uintptr_t) tramp_cap;
+    }
+#endif
+
   rtems_rtl_unlock ();
 
   return (void*) symval;
