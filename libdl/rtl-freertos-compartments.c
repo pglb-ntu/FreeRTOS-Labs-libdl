@@ -242,7 +242,11 @@ void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
   tramp_instance[2] = global_comp_switch;
 
   /* Set num or regions */
+#if (configMPU_EMULATE_UNLIMITED == 1)
   tramp_instance[3] = rtl_cherifreertos_compartment_get_regions_count(compid);
+#else
+  tramp_instance[3] = configMPU_REGIONS_NUM;
+#endif
 
   /* Setup the new compartment ID in the trampoline */
   if (compid >= configCOMPARTMENTS_NUM) {
