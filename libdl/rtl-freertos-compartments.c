@@ -116,6 +116,74 @@ rtl_cherifreertos_is_inter_compartment(rtems_rtl_obj* obj, const char* symname) 
   return isInterCompartment;
 }
 
+__attribute__((section(".text.fast"))) bool
+rtl_cherifreertos_compartment_faultHandler(size_t compid) {
+  BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
+  PendedFunction_t func = NULL;
+
+#if (configCHERI_COMPARTMENTALIZATION_MODE == 1 || configMPU_COMPARTMENTALIZATION_MODE == 1)
+  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
+
+  if (obj == NULL) {
+    printf("Couldn't find an object for compid %zu\n", compid);
+    return false;
+  }
+
+  if (obj->faultHandler == NULL) {
+    #if DEBUG
+      printf("No attached fault handler for compartment %s, returning to caller directly\n", obj->oname);
+    #endif
+    return false;
+  }
+
+  func = (PendedFunction_t) obj->faultHandler;
+#elif (configCHERI_COMPARTMENTALIZATION_MODE == 2 || configMPU_COMPARTMENTALIZATION_MODE == 2)
+  rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
+
+  if (archive == NULL) {
+    printf("Couldn't find an archive for compid %zu\n", compid);
+    return false;
+  }
+
+  if (archive->faultHandler == NULL) {
+    #if DEBUG
+      printf("No fault handler for compartment %s, returning to caller directly\n", archive->name);
+    #endif
+    return false;
+  }
+
+  func = (PendedFunction_t) archive->faultHandler;
+#endif
+
+#if configCHERI_COMPARTMENTALIZATION_FAULT_RETURN
+
+#elif configCHERI_COMPARTMENTALIZATION_FAULT_KILL
+
+// Invalidate GP
+#if configCHERI_COMPARTMENTALIZATION_MODE == 1
+  obj->captable = NULL;
+#else
+  archive->captable = NULL;
+#endif
+  comp_list[compid].captable = NULL;
+  return (bool) pxHigherPriorityTaskWoken;
+
+#elif configCHERI_COMPARTMENTALIZATION_FAULT_CUSTOM
+
+#elif configCHERI_COMPARTMENTALIZATION_FAULT_RESTART
+  if(!rtl_cherifreertos_compartment_rollback(compid))
+    printf("Failed to rollback compartment %zu\n", compid);
+
+  return (bool) pxHigherPriorityTaskWoken;
+#endif
+
+  // Notify the daemon task to run the per-compartment fault handler in its context
+  if (func)
+    xTimerPendFunctionCallFromISR(func, NULL, compid, &pxHigherPriorityTaskWoken);
+
+  return (bool) pxHigherPriorityTaskWoken;
+}
+
 #endif /* configCHERI_COMPARTMENTALIZATION || configMPU_COMPARTMENTALIZATION */
 
 #if configMPU_COMPARTMENTALIZATION
@@ -883,74 +951,6 @@ void rtl_cherifreertos_compartment_register_faultHandler(size_t compid, void* ha
 
   archive->faultHandler = handler;
 #endif
-}
-
-__attribute__((section(".text.fast"))) bool
-rtl_cherifreertos_compartment_faultHandler(size_t compid) {
-  BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
-  PendedFunction_t func = NULL;
-
-#if configCHERI_COMPARTMENTALIZATION_MODE == 1
-  rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
-
-  if (obj == NULL) {
-    printf("Couldn't find an object for compid %zu\n", compid);
-    return false;
-  }
-
-  if (obj->faultHandler == NULL) {
-    #if DEBUG
-      printf("No attached fault handler for compartment %s, returning to caller directly\n", obj->oname);
-    #endif
-    return false;
-  }
-
-  func = (PendedFunction_t) obj->faultHandler;
-#elif configCHERI_COMPARTMENTALIZATION_MODE == 2
-  rtems_rtl_archive* archive = rtl_cherifreertos_compartment_get_archive(compid);
-
-  if (archive == NULL) {
-    printf("Couldn't find an archive for compid %zu\n", compid);
-    return false;
-  }
-
-  if (archive->faultHandler == NULL) {
-    #if DEBUG
-      printf("No fault handler for compartment %s, returning to caller directly\n", archive->name);
-    #endif
-    return false;
-  }
-
-  func = (PendedFunction_t) archive->faultHandler;
-#endif
-
-#if configCHERI_COMPARTMENTALIZATION_FAULT_RETURN
-
-#elif configCHERI_COMPARTMENTALIZATION_FAULT_KILL
-
-// Invalidate GP
-#if configCHERI_COMPARTMENTALIZATION_MODE == 1
-  obj->captable = NULL;
-#else
-  archive->captable = NULL;
-#endif
-  comp_list[compid].captable = NULL;
-  return (bool) pxHigherPriorityTaskWoken;
-
-#elif configCHERI_COMPARTMENTALIZATION_FAULT_CUSTOM
-
-#elif configCHERI_COMPARTMENTALIZATION_FAULT_RESTART
-  if(!rtl_cherifreertos_compartment_rollback(compid))
-    printf("Failed to rollback compartment %zu\n", compid);
-
-  return (bool) pxHigherPriorityTaskWoken;
-#endif
-
-  // Notify the daemon task to run the per-compartment fault handler in its context
-  if (func)
-    xTimerPendFunctionCallFromISR(func, NULL, compid, &pxHigherPriorityTaskWoken);
-
-  return (bool) pxHigherPriorityTaskWoken;
 }
 
 bool
