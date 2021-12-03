@@ -493,12 +493,68 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
   }
   break;
 
-  case R_TYPE(64):
+  case R_TYPE(64): {
+#if configMPU_COMPARTMENTALIZATION
+        rtems_rtl_obj_sym* rtl_sym = rtems_rtl_symbol_obj_find(obj, symname);
+        if (rtl_sym) {
+
+          if (ELF_ST_TYPE(rtl_sym->data >> 16) == STT_FUNC) {
+            // Find the owner compartment of this symbol
+            rtems_rtl_obj* owner_obj = rtems_rtl_find_obj_with_symbol(symname);
+            if (owner_obj == NULL) {
+              // It is a local static function
+              owner_obj = obj;
+            }
+
+            // Get the symbol/capability from the owner's obj/captable
+            rtl_sym = rtems_rtl_symbol_obj_find(owner_obj, symname);
+            if (rtl_sym == NULL) {
+              return rtems_rtl_elf_rel_failure;
+            }
+
+            void* tramp_cap = rtl_cherifreertos_compartments_setup_ecall((void*) symvalue, rtl_cherifreertos_compartment_get_compid(owner_obj));
+            if (tramp_cap == NULL) {
+              return rtems_rtl_elf_rel_failure;
+            } else {
+              symvalue = (size_t) tramp_cap;
+            }
+        }
+      }
+#endif
     write64le(where, symvalue);
-    break;
-  case R_TYPE(32):
+  }
+  break;
+  case R_TYPE(32): {
+#if configMPU_COMPARTMENTALIZATION
+        rtems_rtl_obj_sym* rtl_sym = rtems_rtl_symbol_obj_find(obj, symname);
+        if (rtl_sym) {
+
+          if (ELF_ST_TYPE(rtl_sym->data >> 16) == STT_FUNC) {
+            // Find the owner compartment of this symbol
+            rtems_rtl_obj* owner_obj = rtems_rtl_find_obj_with_symbol(symname);
+            if (owner_obj == NULL) {
+              // It is a local static function
+              owner_obj = obj;
+            }
+
+            // Get the symbol/capability from the owner's obj/captable
+            rtl_sym = rtems_rtl_symbol_obj_find(owner_obj, symname);
+            if (rtl_sym == NULL) {
+              return rtems_rtl_elf_rel_failure;
+            }
+
+            void* tramp_cap = rtl_cherifreertos_compartments_setup_ecall((void*) symvalue, rtl_cherifreertos_compartment_get_compid(owner_obj));
+            if (tramp_cap == NULL) {
+              return rtems_rtl_elf_rel_failure;
+            } else {
+              symvalue = (size_t) tramp_cap;
+            }
+        }
+      }
+#endif
     write32le(where, symvalue);
-    break;
+  }
+  break;
 
   case R_TYPE(SET6):
     *((uint8_t *) where) = (read32le(where) & 0xc0) | (symvalue & 0x3f);
