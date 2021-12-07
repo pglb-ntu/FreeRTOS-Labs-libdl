@@ -714,7 +714,7 @@ rtems_rtl_obj_add_dependent (rtems_rtl_obj* obj, rtems_rtl_obj* dependent)
       free_slot = &(depends->depends[0]);
       if (*free_slot != NULL)
       {
-        rtems_rtl_set_error (EINVAL, "new dependency node not empty");
+        rtems_rtl_set_error (EINVAL, "new dependency node not empty\n");
         free_slot = NULL;
       }
     }
