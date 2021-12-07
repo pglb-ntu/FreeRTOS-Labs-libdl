@@ -1489,7 +1489,16 @@ rtems_rtl_obj_load (rtems_rtl_obj* obj)
   rtems_rtl_obj_sym* sym = rtems_rtl_lsymbol_obj_find (obj, "CheriFreeRTOS_FaultHandler");
 
   if (sym) {
-    rtl_cherifreertos_compartment_register_faultHandler(obj->comp_id, obj->captable[sym->capability]);
+    printf("Registering fault handler for %s obj->comp_id = %u\n", obj->oname, (unsigned) obj->comp_id);
+    void* tramp_cap = rtl_cherifreertos_compartments_setup_ecall(obj->captable[sym->capability], obj->comp_id);
+    size_t cap_offset = 0;
+    if (tramp_cap == NULL) {
+      return false;
+    } else {
+      // Install the new trampoline into the captable
+      cap_offset = rtl_cherifreertos_captable_install_new_cap(obj, tramp_cap);
+      rtl_cherifreertos_compartment_register_faultHandler(obj->comp_id, obj->captable[cap_offset]);
+    }
   }
 #endif /* configCHERI_COMPARTMENTALIZATION_MODE */
 #endif
