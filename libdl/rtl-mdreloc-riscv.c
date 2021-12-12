@@ -851,7 +851,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
       write32le(where, (hi << 12) | read32le(where));
       // cincoffset ctmpreg, cgp, gpr
       // lc ctmpreg, #lo12(cap_addr)(ctmpreg)
-      write32le((where + 2), (lo << 20) | read32le(where + 2));
+      write32le((where + 2), (lo << 20) | read32le(where + 2) & 0x000fffff);
 
       return rtems_rtl_elf_rel_no_error;
     } else {
@@ -912,7 +912,7 @@ rtems_rtl_elf_reloc_rela (rtems_rtl_obj*            obj,
       write32le(where, (hi << 12) | read32le(where));
       // cincoffset ctmpreg, cgp, gpr
       // lc ctmpreg, #lo12(cap_addr)(ctmpreg)
-      write32le((where + 2), (lo << 20) | read32le(where + 2));
+      write32le((where + 2), (lo << 20) | read32le(where + 2) & 0x000fffff);
 
       return rtems_rtl_elf_rel_no_error;
     } else {
