@@ -1255,7 +1255,7 @@ int rtl_cherifreertos_compartment_rollback(size_t compid)
 #if configCHERI_COMPARTMENTALIZATION_FAULT_RESTART
 #if configCHERI_COMPARTMENTALIZATION_MODE == 1
   rtems_rtl_obj* obj = rtl_cherifreertos_compartment_get_obj(compid);
-  size_t captable_len = cheri_length_get(obj->captable_clone);
+  size_t captable_len = obj->caps_count * sizeof(void *);
 
   if (obj->captable_clone == NULL)
     return -1;
@@ -1265,13 +1265,13 @@ int rtl_cherifreertos_compartment_rollback(size_t compid)
     return -1;
   memcpy(obj->text_base, obj->text_clone, obj->text_size);
 
-  if (obj->data_clone == NULL && obj->data_size != 0)
-    return -1;
-  memcpy(obj->data_base, obj->data_clone, obj->data_size);
-
   if (obj->const_clone == NULL && obj->const_size != 0)
     return -1;
   memcpy(obj->const_base, obj->const_clone, obj->const_size);
+
+  if (obj->data_clone == NULL && obj->data_size != 0)
+    return -1;
+  memcpy(obj->data_base, obj->data_clone, obj->data_size);
 
   if (obj->bss_clone == NULL && obj->bss_size != 0)
     return -1;
