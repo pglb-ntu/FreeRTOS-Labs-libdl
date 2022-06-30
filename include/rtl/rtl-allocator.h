@@ -36,6 +36,7 @@ enum rtems_rtl_alloc_tags {
   RTEMS_RTL_ALLOC_CAPTAB,     /**< A captable object. */
   RTEMS_RTL_ALLOC_SYMBOL,     /**< Memory used for symbols. */
   RTEMS_RTL_ALLOC_EXTERNAL,   /**< Memory used for external symbols. */
+  RTEMS_RTL_ALLOC_UNCACHED,   /**< Memory used for uncached symbols. */
   RTEMS_RTL_ALLOC_READ,       /**< The memory is read only. */
   RTEMS_RTL_ALLOC_READ_WRITE, /**< The memory is read and write. */
   RTEMS_RTL_ALLOC_READ_EXEC   /**< The memory is read and executable. */
@@ -227,9 +228,16 @@ rtems_rtl_alloc_tag rtems_rtl_alloc_data_tag (void);
 rtems_rtl_alloc_tag rtems_rtl_alloc_bss_tag (void);
 
 /**
- * Allocate the memory for a module given the size of the text, const, data and
- * bss sections. If any part of the allocation fails the no memory is
- * allocated.
+ * Return the default tag for bss sections.
+ *
+ * @return The bss tag.
+ */
+rtems_rtl_alloc_tag rtems_rtl_alloc_uncached_tag (void);
+
+/**
+ * Allocate the memory for a module given the size of the text, const, data,
+ * bss and uncached sections. If any part of the allocation fails the no memory
+ * is allocated.
  *
  * @param text_base Pointer to the text base pointer.
  * @param text_size The size of the read/exec section.
@@ -241,6 +249,8 @@ rtems_rtl_alloc_tag rtems_rtl_alloc_bss_tag (void);
  * @param data_size The size of the read/write secton.
  * @param bss_base Pointer to the bss base pointer.
  * @param bss_size The size of the read/write.
+ * @param uncached_base Pointer to the uncached base pointer.
+ * @param uncached_size The size of the read/write.
  * @retval true The memory has been allocated.
  * @retval false The allocation of memory has failed.
  */
@@ -248,7 +258,8 @@ bool rtems_rtl_alloc_module_new (void** text_base, size_t text_size,
                                  void** const_base, size_t const_size,
                                  void** eh_base, size_t eh_size,
                                  void** data_base, size_t data_size,
-                                 void** bss_base, size_t bss_size);
+                                 void** bss_base, size_t bss_size,
+                                 void** uncached_base, size_t uncached_size);
 
 /**
  * Free the memory allocated to a module.
@@ -258,10 +269,11 @@ bool rtems_rtl_alloc_module_new (void** text_base, size_t text_size,
  * @param eh_base Pointer to the eh base pointer.
  * @param data_base Pointer to the data base pointer.
  * @param bss_base Pointer to the bss base pointer.
+ * @param uncached_base Pointer to the uncached base pointer.
  */
 void rtems_rtl_alloc_module_del (void** text_base, void** const_base,
                                  void** eh_base, void** data_base,
-                                 void** bss_base);
+                                 void** bss_base, void** uncached_base);
 
 #ifdef __cplusplus
 }

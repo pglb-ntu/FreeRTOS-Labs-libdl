@@ -1609,6 +1609,16 @@ rtems_rtl_elf_parse_sections (rtems_rtl_obj* obj, int fd, Elf_Ehdr* ehdr)
       }
 
       /*
+       * Sections named ".uncached" should be put in the uncached region of
+       * memory.
+       */
+      if (strcmp (".uncached", name) == 0)
+      {
+        flags &= ~(RTEMS_RTL_OBJ_SECT_TYPES);
+        flags |= RTEMS_RTL_OBJ_SECT_UNCACHED | RTEMS_RTL_OBJ_SECT_LOAD;
+      }
+
+      /*
        * Architecture specific parsing. Modified or extends the flags.
        */
       flags = rtems_rtl_elf_arch_parse_section (obj, section, name, &shdr, flags);

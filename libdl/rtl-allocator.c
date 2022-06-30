@@ -266,14 +266,21 @@ rtems_rtl_alloc_bss_tag (void)
   return RTEMS_RTL_ALLOC_READ_WRITE;
 }
 
+rtems_rtl_alloc_tag
+rtems_rtl_alloc_uncached_tag (void)
+{
+  return RTEMS_RTL_ALLOC_UNCACHED;
+}
+
 bool
 rtems_rtl_alloc_module_new (void** text_base, size_t text_size,
                             void** const_base, size_t const_size,
                             void** eh_base, size_t eh_size,
                             void** data_base, size_t data_size,
-                            void** bss_base, size_t bss_size)
+                            void** bss_base, size_t bss_size,
+                            void** uncached_base, size_t uncached_size)
 {
-  *text_base = *const_base = *data_base = *bss_base = NULL;
+  *text_base = *const_base = *data_base = *bss_base = *uncached_base = NULL;
 
   if (text_size)
   {
@@ -292,7 +299,7 @@ rtems_rtl_alloc_module_new (void** text_base, size_t text_size,
     if (!*const_base)
     {
       rtems_rtl_alloc_module_del (text_base, const_base, eh_base,
-                                  data_base, bss_base);
+                                  data_base, bss_base, uncached_base);
       return false;
     }
   }
@@ -304,7 +311,7 @@ rtems_rtl_alloc_module_new (void** text_base, size_t text_size,
     if (!*eh_base)
     {
       rtems_rtl_alloc_module_del (text_base, const_base, eh_base,
-                                  data_base, bss_base);
+                                  data_base, bss_base, uncached_base);
       return false;
     }
   }
@@ -316,7 +323,7 @@ rtems_rtl_alloc_module_new (void** text_base, size_t text_size,
     if (!*data_base)
     {
       rtems_rtl_alloc_module_del (text_base, const_base, eh_base,
-                                  data_base, bss_base);
+                                  data_base, bss_base, uncached_base);
       return false;
     }
   }
@@ -328,7 +335,19 @@ rtems_rtl_alloc_module_new (void** text_base, size_t text_size,
     if (!*bss_base)
     {
       rtems_rtl_alloc_module_del (text_base, const_base, eh_base,
-                                  data_base, bss_base);
+                                  data_base, bss_base, uncached_base);
+      return false;
+    }
+  }
+
+  if (uncached_size)
+  {
+    *uncached_base = rtems_rtl_alloc_new (rtems_rtl_alloc_uncached_tag (),
+                                          uncached_size, false);
+    if (!*uncached_base)
+    {
+      rtems_rtl_alloc_module_del (text_base, const_base, eh_base,
+                                  data_base, bss_base, uncached_base);
       return false;
     }
   }
@@ -341,12 +360,14 @@ rtems_rtl_alloc_module_del (void** text_base,
                             void** const_base,
                             void** eh_base,
                             void** data_base,
-                            void** bss_base)
+                            void** bss_base,
+                            void** uncached_base)
 {
   rtems_rtl_alloc_del (RTEMS_RTL_ALLOC_READ_WRITE, *bss_base);
   rtems_rtl_alloc_del (RTEMS_RTL_ALLOC_READ_WRITE, *data_base);
   rtems_rtl_alloc_del (RTEMS_RTL_ALLOC_READ, *eh_base);
   rtems_rtl_alloc_del (RTEMS_RTL_ALLOC_READ, *const_base);
   rtems_rtl_alloc_del (RTEMS_RTL_ALLOC_READ_EXEC, *text_base);
-  *text_base = *const_base = *eh_base = *data_base = *bss_base = NULL;
+  rtems_rtl_alloc_del (RTEMS_RTL_ALLOC_UNCACHED, *uncached_base);
+  *text_base = *const_base = *eh_base = *data_base = *bss_base = *uncached_base = NULL;
 }

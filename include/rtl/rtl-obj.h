@@ -108,6 +108,7 @@ typedef struct rtems_rtl_loader_table
 #define RTEMS_RTL_OBJ_SECT_DTOR       (1 << 17) /**< Section contains destructors. */
 #define RTEMS_RTL_OBJ_SECT_LOCD       (1 << 18) /**< Section has been located. */
 #define RTEMS_RTL_OBJ_SECT_ARCH_ALLOC (1 << 19) /**< Section use arch allocator. */
+#define RTEMS_RTL_OBJ_SECT_UNCACHED   (1 << 20) /**< Section holds uncached data. */
 
 /**
  * Section types mask.
@@ -117,7 +118,8 @@ typedef struct rtems_rtl_loader_table
                                   RTEMS_RTL_OBJ_SECT_DATA | \
                                   RTEMS_RTL_OBJ_SECT_BSS | \
                                   RTEMS_RTL_OBJ_SECT_TLS | \
-                                  RTEMS_RTL_OBJ_SECT_EH)
+                                  RTEMS_RTL_OBJ_SECT_EH | \
+                                  RTEMS_RTL_OBJ_SECT_UNCACHED)
 
 /**
  * An object file is made up of sections and the can be more than
@@ -214,25 +216,28 @@ struct rtems_rtl_obj
   List_t              externals_list;  /* A list of external symbols */
   size_t              externals_syms;  /**< Externals symbol count. */
 
-  size_t              global_size;  /**< Global symbol memory usage. */
-  size_t              unresolved;   /**< The number of unresolved relocations. */
-  void*               text_base;    /**< The base address of the text section
-                                     *   in memory. */
-  size_t              text_size;    /**< The size of the text section. */
-  void*               const_base;   /**< The base address of the const section
-                                     *   in memory. */
-  size_t              const_size;   /**< The size of the const section. */
-  void*               eh_base;      /**< The base address of the eh section in
-                                     *   memory. */
-  size_t              eh_size;      /**< The size of the eh section. */
-  void*               data_base;    /**< The base address of the data section
-                                     *   in memory. */
-  size_t              data_size;    /**< The size of the data section. */
-  void*               bss_base;     /**< The base address of the bss section in
-                                     *   memory. */
-  size_t              bss_size;     /**< The size of the bss section. */
-  size_t              exec_size;    /**< The amount of executable memory
-                                     *   allocated */
+  size_t              global_size;    /**< Global symbol memory usage. */
+  size_t              unresolved;     /**< The number of unresolved relocations. */
+  void*               text_base;      /**< The base address of the text section
+                                       *   in memory. */
+  size_t              text_size;      /**< The size of the text section. */
+  void*               const_base;     /**< The base address of the const section
+                                       *   in memory. */
+  size_t              const_size;     /**< The size of the const section. */
+  void*               eh_base;        /**< The base address of the eh section in
+                                       *   memory. */
+  size_t              eh_size;        /**< The size of the eh section. */
+  void*               data_base;      /**< The base address of the data section
+                                       *   in memory. */
+  size_t              data_size;      /**< The size of the data section. */
+  void*               bss_base;       /**< The base address of the bss section in
+                                       *   memory. */
+  size_t              bss_size;       /**< The size of the bss section. */
+  void*               uncached_base;  /**< The base address of the uncached
+                                       *   section in memory. */
+  size_t              uncached_size;  /**< The size of the uncached section. */
+  size_t              exec_size;      /**< The amount of executable memory
+                                       *   allocated */
 #if configCHERI_COMPARTMENTALIZATION && configCHERI_COMPARTMENTALIZATION_FAULT_RESTART
   void**              captable_clone;/* Capability table per object */
   void*               text_clone;    /**< The base address of the text section

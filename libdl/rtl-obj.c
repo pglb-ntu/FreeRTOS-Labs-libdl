@@ -121,7 +121,8 @@ rtems_rtl_obj_free (rtems_rtl_obj* obj)
   if (listLIST_ITEM_CONTAINER (&obj->link))
     uxListRemove (&obj->link);
   rtems_rtl_alloc_module_del (&obj->text_base, &obj->const_base, &obj->eh_base,
-                              &obj->data_base, &obj->bss_base);
+                              &obj->data_base, &obj->bss_base,
+                              &obj->uncached_base);
   rtems_rtl_obj_erase_sections (obj);
   rtems_rtl_obj_erase_dependents (obj);
   rtems_rtl_symbol_obj_erase (obj);
@@ -851,6 +852,18 @@ rtems_rtl_obj_bss_alignment (const rtems_rtl_obj* obj)
   return rtems_rtl_obj_section_alignment (obj, RTEMS_RTL_OBJ_SECT_BSS);
 }
 
+size_t
+rtems_rtl_obj_uncached_size (const rtems_rtl_obj* obj)
+{
+  return rtems_rtl_obj_section_size (obj, RTEMS_RTL_OBJ_SECT_UNCACHED);
+}
+
+uint32_t
+rtems_rtl_obj_uncached_alignment (const rtems_rtl_obj* obj)
+{
+  return rtems_rtl_obj_section_alignment (obj, RTEMS_RTL_OBJ_SECT_UNCACHED);
+}
+
 bool
 rtems_rtl_obj_relocate (rtems_rtl_obj*             obj,
                         int                        fd,
@@ -1111,21 +1124,26 @@ rtems_rtl_obj_alloc_sections (rtems_rtl_obj*             obj,
   size_t eh_size;
   size_t data_size;
   size_t bss_size;
+  size_t uncached_size;
 
-  text_size  = rtems_rtl_obj_text_size (obj) + rtems_rtl_obj_const_alignment (obj);
-  const_size = rtems_rtl_obj_const_size (obj) + rtems_rtl_obj_eh_alignment (obj);
-  eh_size    = rtems_rtl_obj_eh_size (obj) + rtems_rtl_obj_data_alignment (obj);
-  data_size  = rtems_rtl_obj_data_size (obj) + rtems_rtl_obj_bss_alignment (obj);
-  bss_size   = rtems_rtl_obj_bss_size (obj);
+  text_size      = rtems_rtl_obj_text_size (obj) + rtems_rtl_obj_const_alignment (obj);
+  const_size     = rtems_rtl_obj_const_size (obj) + rtems_rtl_obj_eh_alignment (obj);
+  eh_size        = rtems_rtl_obj_eh_size (obj) + rtems_rtl_obj_data_alignment (obj);
+  data_size      = rtems_rtl_obj_data_size (obj) + rtems_rtl_obj_bss_alignment (obj);
+  bss_size       = rtems_rtl_obj_bss_size (obj);
+  // TODO does this need the alignment of anything else?
+  uncached_size  = rtems_rtl_obj_uncached_size (obj);
+
 
   /*
    * Set the sizes held in the object data. We need this for a fast reference.
    */
-  obj->text_size  = text_size;
-  obj->const_size = const_size;
-  obj->data_size  = data_size;
-  obj->eh_size    = eh_size;
-  obj->bss_size   = bss_size;
+  obj->text_size     = text_size;
+  obj->const_size    = const_size;
+  obj->data_size     = data_size;
+  obj->eh_size       = eh_size;
+  obj->bss_size      = bss_size;
+  obj->uncached_size = uncached_size;
 
   /*
    * Perform any specific allocations for sections.
@@ -1151,37 +1169,44 @@ rtems_rtl_obj_alloc_sections (rtems_rtl_obj*             obj,
                                    &obj->const_base, const_size,
                                    &obj->eh_base, eh_size,
                                    &obj->data_base, data_size,
-                                   &obj->bss_base, bss_size))
+                                   &obj->bss_base, bss_size,
+                                   &obj->uncached_base, uncached_size))
   {
     obj->exec_size = 0;
     rtems_rtl_set_error (ENOMEM, "no memory to load obj");
     return false;
   }
 
+  // TODO does uncached count as executable? presumably not
   obj->exec_size = text_size + const_size + eh_size + data_size + bss_size;
 
   if (rtems_rtl_trace (RTEMS_RTL_TRACE_LOAD_SECT))
   {
-    printf ("rtl: load sect: text  - b:%p s:%zi a:%" PRIu32 "\n",
+    printf ("rtl: load sect: text      - b:%p s:%zi a:%" PRIu32 "\n",
             obj->text_base, text_size, rtems_rtl_obj_text_alignment (obj));
-    printf ("rtl: load sect: const - b:%p s:%zi a:%" PRIu32 "\n",
+    printf ("rtl: load sect: const     - b:%p s:%zi a:%" PRIu32 "\n",
             obj->const_base, const_size, rtems_rtl_obj_const_alignment (obj));
-    printf ("rtl: load sect: eh    - b:%p s:%zi a:%" PRIu32 "\n",
+    printf ("rtl: load sect: eh        - b:%p s:%zi a:%" PRIu32 "\n",
             obj->eh_base, eh_size, rtems_rtl_obj_eh_alignment (obj));
-    printf ("rtl: load sect: data  - b:%p s:%zi a:%" PRIu32 "\n",
+    printf ("rtl: load sect: data      - b:%p s:%zi a:%" PRIu32 "\n",
             obj->data_base, data_size, rtems_rtl_obj_data_alignment (obj));
-    printf ("rtl: load sect: bss   - b:%p s:%zi a:%" PRIu32 "\n",
+    printf ("rtl: load sect: bss       - b:%p s:%zi a:%" PRIu32 "\n",
             obj->bss_base, bss_size, rtems_rtl_obj_bss_alignment (obj));
+    printf ("rtl: load sect: uncached  - b:%p s:%zi a:%" PRIu32 "\n",
+            obj->uncached_base,
+            uncached_size,
+            rtems_rtl_obj_uncached_alignment (obj));
   }
 
   /*
    * Determine the load order.
    */
-  rtems_rtl_obj_sections_link_order (RTEMS_RTL_OBJ_SECT_TEXT,  obj);
-  rtems_rtl_obj_sections_link_order (RTEMS_RTL_OBJ_SECT_CONST, obj);
-  rtems_rtl_obj_sections_link_order (RTEMS_RTL_OBJ_SECT_EH,    obj);
-  rtems_rtl_obj_sections_link_order (RTEMS_RTL_OBJ_SECT_DATA,  obj);
-  rtems_rtl_obj_sections_link_order (RTEMS_RTL_OBJ_SECT_BSS,   obj);
+  rtems_rtl_obj_sections_link_order (RTEMS_RTL_OBJ_SECT_TEXT,     obj);
+  rtems_rtl_obj_sections_link_order (RTEMS_RTL_OBJ_SECT_CONST,    obj);
+  rtems_rtl_obj_sections_link_order (RTEMS_RTL_OBJ_SECT_EH,       obj);
+  rtems_rtl_obj_sections_link_order (RTEMS_RTL_OBJ_SECT_DATA,     obj);
+  rtems_rtl_obj_sections_link_order (RTEMS_RTL_OBJ_SECT_BSS,      obj);
+  rtems_rtl_obj_sections_link_order (RTEMS_RTL_OBJ_SECT_UNCACHED, obj);
 
   /*
    * Locate all text, data and bss sections in seperate operations so each type of
@@ -1202,6 +1227,9 @@ rtems_rtl_obj_alloc_sections (rtems_rtl_obj*             obj,
   rtems_rtl_obj_sections_locate (RTEMS_RTL_OBJ_SECT_BSS,
                                  rtems_rtl_alloc_bss_tag (),
                                  obj, obj->bss_base);
+  rtems_rtl_obj_sections_locate (RTEMS_RTL_OBJ_SECT_UNCACHED,
+                                 rtems_rtl_alloc_uncached_tag (),
+                                 obj, obj->uncached_base);
 
   return true;
 }
@@ -1299,10 +1327,14 @@ rtems_rtl_obj_load_sections (rtems_rtl_obj*             obj,
                                       obj, fd, obj->data_base, handler, data) ||
       !rtems_rtl_obj_sections_loader (RTEMS_RTL_OBJ_SECT_BSS,
                                       rtems_rtl_alloc_bss_tag (),
-                                      obj, fd, obj->bss_base, handler, data))
+                                      obj, fd, obj->bss_base, handler, data) ||
+      !rtems_rtl_obj_sections_loader (RTEMS_RTL_OBJ_SECT_UNCACHED,
+                                      rtems_rtl_alloc_uncached_tag (),
+                                      obj, fd, obj->uncached_base, handler, data))
   {
     rtems_rtl_alloc_module_del (&obj->text_base, &obj->const_base, &obj->eh_base,
-                                &obj->data_base, &obj->bss_base);
+                                &obj->data_base, &obj->bss_base,
+                                &obj->uncached_base);
     obj->exec_size = 0;
     return false;
   }

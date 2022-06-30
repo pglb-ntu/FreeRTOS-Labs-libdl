@@ -23,7 +23,9 @@ extern "C" {
 #endif /* __cplusplus */
 
 void * pvRTLMalloc( size_t xWantedSize );
+void * pvRTLUncachedMalloc( size_t xWantedSize );
 void vRTLFree( void * pv );
+void vRTLUncachedFree( void * pv);
 size_t xRTLtGetFreeHeapSize();
 
 /**
