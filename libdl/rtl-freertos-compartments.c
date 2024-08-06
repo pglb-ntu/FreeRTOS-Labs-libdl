@@ -259,6 +259,7 @@ rtl_cherifreertos_compartment_obj_get_captable(rtems_rtl_obj* obj) {
 
 void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
 {
+ 
   rtems_rtl_obj* kernel_obj = rtems_rtl_baseimage();
   rtems_rtl_obj_sym* tramp_sym;
   rtems_rtl_obj_sym* comp_switch_sym;
@@ -859,6 +860,7 @@ rtl_cherifreertos_captable_install_new_cap(rtems_rtl_obj* obj, void* new_cap) {
 
 void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
 {
+  printf("TEST CALL rtl_cherifreertos_compartments_setup_ecall \n");
   rtems_rtl_obj* kernel_obj = rtems_rtl_baseimage();
   rtems_rtl_obj_sym* tramp_sym;
   rtems_rtl_obj_sym* comp_switch_sym;
@@ -870,12 +872,14 @@ void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
   /* Find the xPortCompartmentTrampSetup template to copy from. This contains metadata such as
    * function, captable, trampoline func, etc required for further compartment switch */
   tramp_sym = rtems_rtl_symbol_global_find ("xPortCompartmentTrampSetup");
+  
   if (tramp_sym == NULL) {
     printf("Failed to find xPortCompartmentTrampSetup needed for inter-compartment calls\n");
     return NULL;
   }
+printf("Found xPortCompartmentTrampSetup\n");
 
-  /* Install the default compartment switch. TODO This might be cusom for compartment-matrices with
+  /* Install the default compartment switch. TODO This might be custom for compartment-matrices with
    * refined compartment policies that differ between different inter-compartment calls
    */
   comp_switch_sym = rtems_rtl_symbol_global_find ("xPortCompartmentEnterTrampoline");
@@ -883,22 +887,23 @@ void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
     printf("Failed to find xPortCompartmentEnterTrampoline needed for inter-compartment calls\n");
     return NULL;
   }
-
+  printf("found xPortCompartmentEnterTrampoline\n");
   // Get a capability to the setup trampoline function and metadata
   tramp_cap_template = captable[tramp_sym->capability];
   // Get a capability to the global default compartment switch function
   global_comp_switch = captable[comp_switch_sym->capability];
 
   /* Allocate memory for the new setup trampoline */
+  printf("tramp sym:%i\n",tramp_sym->size);
   tramp_cap_instance = rtems_rtl_alloc_new (RTEMS_RTL_ALLOC_READ_EXEC, tramp_sym->size, true);
   if (tramp_cap_instance == NULL) {
     printf("Failed to allocate a new trampoline to do external calls\n");
     return NULL;
   }
-
+  printf("Allocated new trampoline\n");
   /* Copy template trampoline into the newly allocated area of memory */
   memcpy((void *) tramp_cap_instance, (void *) tramp_cap_template, tramp_sym->size);
-
+  printf("after memcpy, setting up values\n");
   /* Setup code cap in the trampoline */
   tramp_cap_instance[0] = code;
 
@@ -907,16 +912,19 @@ void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
 
   /* Setup default compartment switch function */
   tramp_cap_instance[2] = global_comp_switch;
-
+  printf("accessing counter\n");
+  comp_list[compid].counter = 0;
+  tramp_cap_instance[3] = &comp_list[compid].counter;
   /* Setup the new compartment ID in the trampoline */
   if (compid >= configCOMPARTMENTS_NUM) {
     return NULL;
   }
-
+  printf("before setting up compartment id\n");
   /* Setup compartment ID by fixing up ADDI immediate */
-  uint32_t* addi_inst = (uint32_t*) &tramp_cap_instance[3];
+  uint32_t* addi_inst = (uint32_t*) &tramp_cap_instance[4];
+  printf("after access to code\n");
   *addi_inst = ((*addi_inst) & 0x000fffff) | (compid << 20);
-
+  printf("before making trampoline cap RX\n");
   /* Make the trampoline cap RX only */
   tramp_cap_instance = cheri_build_code_cap((ptraddr_t) tramp_cap_instance,
       tramp_sym->size,
@@ -926,8 +934,9 @@ void* rtl_cherifreertos_compartments_setup_ecall(void* code, size_t compid)
       __CHERI_CAP_PERMISSION_PERMIT_LOAD__ | \
       __CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__);
 
-  /* return a sentry trampoline cap with an address of the first instruction */
-  return cheri_sentry_create(&tramp_cap_instance[3]);
+ printf("before returning in trampoline compartment\n"); 
+ /* return a sentry trampoline cap with an address of the first instruction */
+  return cheri_sentry_create(&tramp_cap_instance[4]);
 }
 
 void rtl_cherifreertos_compartment_register_faultHandler(size_t compid, void* handler)

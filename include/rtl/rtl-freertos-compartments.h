@@ -14,6 +14,8 @@ typedef struct compartment {
   void*       archive;
 #endif /* configCHERI_COMPARTMENTALIZATION_MODE */
   uint64_t    id;
+  
+  uint64_t counter;
 } Compartment_t;
 
 typedef enum resource {
