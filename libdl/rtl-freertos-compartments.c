@@ -914,6 +914,7 @@ printf("Found xPortCompartmentTrampSetup\n");
   tramp_cap_instance[2] = global_comp_switch;
   printf("accessing counter\n");
   //comp_list[compid].counter = 0;
+  comp_list[compid].counter = 0;
   tramp_cap_instance[3] = &comp_list[compid].counter;
   /* Setup the new compartment ID in the trampoline */
   if (compid >= configCOMPARTMENTS_NUM) {
